@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Thesis Template Pack",
+  "description": "A reusable outline + writing-logic template for a specific degree type, institution, or venue.",
+  "type": "object",
+  "required": ["id", "name", "degreeType", "targetWords", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Unique kebab-case identifier."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable display name."
+    },
+    "degreeType": {
+      "type": "string",
+      "enum": ["bachelor", "master", "doctor", "conference"]
+    },
+    "targetWords": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Default total word count for the thesis."
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["title", "ratio", "objective", "logic"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+          "objective": { "type": "string" },
+          "logic": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["purpose"],
+              "additionalProperties": false,
+              "properties": {
+                "purpose": { "type": "string", "minLength": 1 },
+                "transition": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

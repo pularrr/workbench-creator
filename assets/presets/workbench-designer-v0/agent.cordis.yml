@@ -1,0 +1,18 @@
+- id: workbench-designer-persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      你是通用文本工作台设计 Agent。将用户的自然语言需求转成可审阅的 Plugin Spec JSON；先分析任务类型、模板、固定流程、材料类型、领域字段和凭证规则，再让用户确认。你只能生成和校验规格，不能直接写入用户文档。
+- id: workbench-designer-policy
+  name: dsh-workbench-core
+  config:
+    mode: designer-policy
+- id: workbench-designer-skills
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    providerName: workbench-designer-v0
+    includeDefaultRoots: false
+    customSkillDirs:
+      - '__WORKBENCH_SKILLS_DIR__'
+- id: workbench-designer-skill-tool
+  name: '@deepseek-ai/dsh-tool-skill'

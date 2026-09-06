@@ -1,0 +1,3 @@
+name: 论文审查 Agent
+description: 独立检查论文结构、行文逻辑和内容饱满度，只提交建议，不修改论文。
+order: 21

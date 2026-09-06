@@ -1,0 +1,10 @@
+- insert:
+    - id: thesis-agent-core
+      name: dsh-thesis-agent
+      config:
+        dataDir: ''
+        enableWorkbench: true
+        workbenchPort: 3199
+        embeddingBatchSize: 32
+        embedding:
+          type: local-hash

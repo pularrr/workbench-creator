@@ -1,0 +1,105 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 736" width="100%" role="img" aria-label="Thesis-Agent 分层架构图" font-family="-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif">
+  <rect width="960" height="736" fill="#F4F3EE"/>
+  <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9BBBF4"/></marker></defs>
+  <text x="40" y="30" font-size="18" font-weight="700" fill="#1A1B1C">Thesis-Agent · 分层架构</text>
+  <text x="40" y="50" font-size="12" fill="#6B7280">AI 只能提案 · 系统必须审批 · 证据必须追踪 · 修改必须版本化</text>
+
+  <!-- ① 交互层 -->
+  <rect x="40" y="66" width="880" height="26" rx="6" fill="#E9EEFB"/>
+  <text x="52" y="84" font-size="13" font-weight="700" fill="#3E5CB8">① 交互层（对话 ⇄ 工作台双向联动）</text>
+  <rect x="40" y="100" width="420" height="56" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+  <text x="56" y="122" font-size="13" font-weight="600" fill="#1A1B1C">DSH 对话界面</text>
+  <text x="56" y="140" font-size="11" fill="#4B5563">自然语言：建项目 / 导材料 / 生成 / 审批 / 导出</text>
+  <rect x="500" y="100" width="420" height="56" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+  <text x="516" y="122" font-size="13" font-weight="600" fill="#1A1B1C">论文写作工作台 Web UI（127.0.0.1:3199）</text>
+  <text x="516" y="140" font-size="11" fill="#4B5563">双区 4:3 可拖拽 · 大纲/行文逻辑/来源/版本/任务/模板/设置</text>
+  <text x="470" y="116" text-anchor="middle" font-size="16" fill="#3E5CB8" font-weight="700">⇄</text>
+
+  <!-- ② Agent 编排层 -->
+  <rect x="40" y="170" width="880" height="26" rx="6" fill="#E9EEFB"/>
+  <text x="52" y="188" font-size="13" font-weight="700" fill="#3E5CB8">② Agent 编排层（多 Agent + 工具治理）</text>
+  <rect x="40" y="204" width="420" height="58" rx="8" fill="#FFFFFF" stroke="#9BBBF4" stroke-width="1.5"/>
+  <text x="56" y="226" font-size="13" font-weight="600" fill="#1A1B1C">写作 Agent · thesis-writer-v0</text>
+  <text x="56" y="244" font-size="11" fill="#4B5563">9 个领域 Skills：项目接入/规划/检索溯源/文献引用/</text>
+  <text x="56" y="257" font-size="11" fill="#4B5563">受控生成/受控重写/版本导出/Embedding 配置</text>
+  <rect x="500" y="204" width="420" height="58" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+  <text x="516" y="226" font-size="13" font-weight="600" fill="#1A1B1C">审查 Agent · thesis-review-v0</text>
+  <text x="516" y="244" font-size="11" fill="#4B5563">只读白名单（4 个工具），无任何写入能力</text>
+  <text x="516" y="257" font-size="11" fill="#4B5563">只提交结构化建议，永不直接改正文</text>
+  <text x="470" y="222" text-anchor="middle" font-size="9.5" fill="#6B7280">审查</text>
+  <text x="470" y="234" text-anchor="middle" font-size="9.5" fill="#6B7280">建议</text>
+  <path d="M462 230 H500" stroke="#9BBBF4" stroke-width="1.5" marker-end="url(#arr)"/>
+  <rect x="40" y="270" width="880" height="34" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+  <text x="56" y="285" font-size="12" font-weight="600" fill="#1A1B1C">工具桥 · 65 个 thesis_* 工具</text>
+  <text x="56" y="298" font-size="10.5" fill="#4B5563">JSON Schema 强校验 · Lossless-JSON 序列化守卫 · expectedRevision 乐观并发 · 工具级并发安全标记 · writer/review 白名单分流</text>
+
+  <!-- ③ 领域引擎层 -->
+  <rect x="40" y="316" width="880" height="26" rx="6" fill="#E9EEFB"/>
+  <text x="52" y="334" font-size="13" font-weight="700" fill="#3E5CB8">③ 领域引擎层（论文写作核心业务逻辑）</text>
+  <g font-size="11" fill="#4B5563">
+    <rect x="40" y="350" width="280" height="92" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="56" y="370" font-size="13" font-weight="600" fill="#1A1B1C">规划与模板</text>
+    <text x="56" y="388">· 大纲 + 行文逻辑双层规划</text>
+    <text x="56" y="403">· 硕士/本科/会议模板包 + 自定义模板</text>
+    <text x="56" y="418">· 规划确认后乐观锁保护</text>
+    <text x="56" y="433">· 章节级预计图表数多模态规划</text>
+    <rect x="340" y="350" width="280" height="92" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="356" y="370" font-size="13" font-weight="600" fill="#1A1B1C">证据检索 RAG</text>
+    <text x="356" y="388">· 多格式解析（PDF/DOCX/PPTX/XLSX…）</text>
+    <text x="356" y="403">· 结构分块 → Embedding（本地/远程）</text>
+    <text x="356" y="418">· 混合检索 0.45×词频 + 0.55×向量</text>
+    <text x="356" y="433">· 可选 Rerank · 预算化证据包 · 来源绑定</text>
+    <rect x="640" y="350" width="280" height="92" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="656" y="370" font-size="13" font-weight="600" fill="#1A1B1C">受控生成</text>
+    <text x="656" y="388">· 范围候选 → 用户确认才落笔</text>
+    <text x="656" y="403">· 无证据写 [待补充证据]，禁止捏造</text>
+    <text x="656" y="418">· 用户锁定块永不覆盖</text>
+    <text x="656" y="433">· 最小范围修改，只影响关联章节</text>
+    <rect x="40" y="454" width="280" height="92" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="56" y="474" font-size="13" font-weight="600" fill="#1A1B1C">审查与修订</text>
+    <text x="56" y="492">· 建议池：编辑 / 接受 / 拒绝</text>
+    <text x="56" y="507">· 已接受建议 + 用户修改 → 修订批次</text>
+    <text x="56" y="522">· 冲突解决 → 批次确认 → Patch 二次审批</text>
+    <text x="56" y="537">· 每次审批都是独立用户决策点</text>
+    <rect x="340" y="454" width="280" height="92" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="356" y="474" font-size="13" font-weight="600" fill="#1A1B1C">版本与质量</text>
+    <text x="356" y="492">· 块级版本事务：命名快照 / diff / 无损恢复</text>
+    <text x="356" y="507">· 源变更自动失效旧绑定与引用</text>
+    <text x="356" y="522">· 确定性质量检查：数字来源 / 重复段落 /</text>
+    <text x="356" y="537">· 章节覆盖 / 术语一致性</text>
+    <rect x="640" y="454" width="280" height="92" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="656" y="474" font-size="13" font-weight="600" fill="#1A1B1C">导出</text>
+    <text x="656" y="492">· DOCX：公式上下标渲染 / 章节自动编号</text>
+    <text x="656" y="507">· LaTeX→PDF：数学符号映射 / XeLaTeX 编译</text>
+    <text x="656" y="522">· 引用格式 GB/T 7714 / APA</text>
+    <text x="656" y="537">· 图表/公式交叉引用与孤儿引用检查</text>
+  </g>
+
+  <!-- ④ 运行治理 -->
+  <rect x="40" y="558" width="880" height="26" rx="6" fill="#E9EEFB"/>
+  <text x="52" y="576" font-size="13" font-weight="700" fill="#3E5CB8">④ 运行治理 · ⑤ 基础设施（全部可插拔）</text>
+  <rect x="40" y="592" width="880" height="34" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+  <text x="56" y="607" font-size="12" font-weight="600" fill="#1A1B1C">AgentRun 状态机（受控 ReAct）</text>
+  <text x="56" y="620" font-size="10.5" fill="#4B5563">created → planning → 等待计划确认 → retrieving → 证据评估 → drafting → validating → reviewing → 等待用户决策 → applying · 预算/审计/暂停·恢复</text>
+
+  <g font-size="11" fill="#4B5563">
+    <rect x="40" y="636" width="215" height="66" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="54" y="654" font-size="12" font-weight="600" fill="#1A1B1C">存储</text>
+    <text x="54" y="670">JSON（默认）/ SQLite WAL</text>
+    <text x="54" y="685">schemaVersion 只增不减 + 迁移</text>
+    <rect x="267" y="636" width="215" height="66" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="281" y="654" font-size="12" font-weight="600" fill="#1A1B1C">Embedding</text>
+    <text x="281" y="670">local-hash 192 维（零依赖）</text>
+    <text x="281" y="685">OpenAI-compatible · 6 家预设</text>
+    <rect x="494" y="636" width="215" height="66" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="508" y="654" font-size="12" font-weight="600" fill="#1A1B1C">Rerank</text>
+    <text x="508" y="670">本地 BM25 / Cohere / Voyage</text>
+    <text x="508" y="685">外部失败自动降级本地，检索不中断</text>
+    <rect x="721" y="636" width="199" height="66" rx="8" fill="#FFFFFF" stroke="#E4E3DD"/>
+    <text x="735" y="654" font-size="12" font-weight="600" fill="#1A1B1C">解析 / OCR / 适配</text>
+    <text x="735" y="670">officeparser + pdfjs-dist</text>
+    <text x="735" y="685">Tesseract/PaddleOCR · RAGFlow</text>
+  </g>
+
+  <text x="40" y="722" font-size="11" fill="#6B7280">图例：方框 = 模块/组件；横带 = 架构层级；⇄ = 双向联动；箭头 = 数据流 / 依赖</text>
+</svg>

@@ -1,0 +1,18 @@
+- id: workbench-reviewer-persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      你是通用文本工作台审查 Agent。检查文档结构、领域字段、材料证据、引用绑定、术语一致性和版本差异；只报告结构化问题和修改建议，不直接修改项目正文。
+- id: workbench-reviewer-policy
+  name: dsh-workbench-core
+  config:
+    mode: reviewer-policy
+- id: workbench-reviewer-skills
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    providerName: workbench-reviewer-v0
+    includeDefaultRoots: false
+    customSkillDirs:
+      - '__WORKBENCH_SKILLS_DIR__'
+- id: workbench-reviewer-skill-tool
+  name: '@deepseek-ai/dsh-tool-skill'

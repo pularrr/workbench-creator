@@ -1,0 +1,8 @@
+- insert:
+    - id: workbench-core
+      name: dsh-workbench-core
+      config:
+        dataDir: ''
+        enableWorkbench: true
+        workbenchPort: 3200
+        defaultTaskType: thesis

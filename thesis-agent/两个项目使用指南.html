@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>thesis-agent 与 workbench-core 使用指南</title>
+<style>
+  :root{
+    --text:#1A1B1C; --text2:#4B5563; --muted:#6B7280;
+    --bg:#F4F3EE; --card:#FFFFFF; --border:#E4E3DD;
+    --accent:#9BBBF4; --accent-deep:#3E5CB8; --tech:#8BC8EA; --warn:#FAAD14; --ok:#52C41A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:0;background:var(--bg);color:var(--text);
+       font-family:'PingFang SC','Microsoft YaHei','Segoe UI',Arial,sans-serif;line-height:1.7;}
+  .wrap{max-width:960px;margin:0 auto;padding:24px 20px 60px;}
+  header{padding:28px 24px;background:linear-gradient(135deg,#E9EEFB,#F4F3EE 70%);
+         border:1px solid var(--border);border-radius:16px;margin-bottom:20px;}
+  header h1{margin:0 0 6px;font-size:24px;}
+  header p{margin:0;color:var(--muted);font-size:14px;}
+  .tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;
+       background:var(--accent);color:#fff;margin-right:6px;}
+  h2{font-size:19px;margin:34px 0 12px;padding-left:10px;border-left:4px solid var(--accent-deep);}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--text);}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:12px 0;}
+  code,pre{font-family:Consolas,'Courier New',monospace;}
+  code{background:#EEF1F6;border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:13px;}
+  pre{background:#F8F9FB;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px;
+      overflow-x:auto;line-height:1.6;}
+  pre code{background:none;border:none;padding:0;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+  th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top;}
+  th{background:#EEF1FB;font-weight:600;}
+  tr:nth-child(even) td{background:#FAFAF8;}
+  .grid2{display:flex;gap:14px;flex-wrap:wrap;}
+  .grid2>div{flex:1 1 300px;min-width:0;}
+  .step{display:flex;gap:10px;margin:8px 0;align-items:flex-start;}
+  .stepnum{flex:0 0 22px;height:22px;border-radius:50%;background:var(--accent-deep);color:#fff;
+           font-size:12px;display:flex;align-items:center;justify-content:center;margin-top:4px;}
+  .warn{background:#FFF8E8;border:1px solid #F3DFA8;border-radius:12px;padding:12px 14px;font-size:13px;color:#7A5B12;}
+  .ok{background:#F2FBF0;border:1px solid #C9E8C2;border-radius:12px;padding:12px 14px;font-size:13px;color:#2E6B22;}
+  .flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;margin:8px 0;}
+  .flow .node{background:#EEF1FB;border:1px solid #CBD7F0;border-radius:8px;padding:4px 10px;color:var(--accent-deep);}
+  .flow .arr{color:var(--muted);}
+  .kbd{background:#fff;border:1px solid #C9CFD8;border-bottom-width:2px;border-radius:5px;
+       padding:0 6px;font-size:12px;font-family:Consolas,monospace;}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center;}
+  @media (max-width:560px){ body{font-size:14px;} header h1{font-size:20px;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>两个 DSH 插件项目 · 使用指南</h1>
+  <p><span class="tag">thesis-agent v1.2.0</span><span class="tag">workbench-core v0.1.0</span>
+     证据驱动的论文写作智能体工作台 → 可插拔文本处理工作台框架（v2.0 演进）</p>
+</header>
+
+<div class="card">
+  <h3 style="margin-top:0;">0 · 先看懂关系</h3>
+  <p style="margin:6px 0;font-size:14px;">
+    <b>thesis-agent</b> 是把「AI 只能提案 → 系统必须审批 → 证据必须追踪 → 修改必须版本化」落到工程架构里的<b>论文专用</b>多 Agent 应用；
+    <b>workbench-core</b> 把它的核心架构（状态机 / 存储 / 双区工作台 UI / 模板 / 版本）抽象成<b>通用框架</b>，
+    通过 Framework / Logic / Evidence（+可选 Material）三层插件支持论文、专利、合同、技术报告等任务，并可用 LLM 一键生成新任务类型的插件包。
+  </p>
+  <div class="flow">
+    <span class="node">thesis-agent（论文专用）</span><span class="arr">→ 抽象核心架构 →</span>
+    <span class="node">workbench-core（通用框架）</span><span class="arr">→ 内置</span>
+    <span class="node">thesis 插件</span><span class="node">patent 插件</span><span class="arr">+ 可生成</span>
+    <span class="node">contract / tech-report / generic</span>
+  </div>
+</div>
+
+<div class="ok">
+  <b>当前机器环境核对（已实测）：</b>
+  Node <code>v22.23.2</code> ✅（满足 <code>^22.19.0</code> 要求）· npm <code>10.9.8</code> ✅ · dsh CLI 已安装 ✅ ·
+  两个项目 <code>node_modules</code> 均已安装 ✅ · 当前仅 <code>dsh-thesis-agent</code> 已注册到 web profile，
+  <b>workbench-core 尚未注册</b>（要用它需先执行注册）。
+</div>
+
+<h2>1 · 项目一：thesis-agent（论文写作工作台）</h2>
+
+<div class="card">
+  <h3 style="margin-top:0;">1.1 安装与启动</h3>
+  <pre><code># 在 D:\雷达毕设相关\high_star\thesis-agent 目录下
+dsh plugin --profile web add .     # ① 注册插件（当前已注册，可跳过）
+npm run setup                       # ② 安装 Preset 行为资产（写作/审查 Agent 配置）
+dsh web                             # ③ 启动 DSH（含工作台服务）</code></pre>
+  <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
+    启动后访问：<b>论文写作工作台 http://127.0.0.1:3199</b>；DSH 对话界面会话头部会出现「论文工作台」按钮。
+    改过代码后需重装：<code>dsh plugin --profile web remove dsh-thesis-agent</code> → <code>dsh plugin --profile web add .</code> → <code>npm run setup</code>。
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">1.2 典型使用路径（对话驱动）</h3>
+  <div class="flow">
+    <span class="node">建项目</span><span class="arr">→</span><span class="node">定规划（大纲+行文逻辑，需确认）</span><span class="arr">→</span>
+    <span class="node">导材料（扫描目录→分块→建索引）</span><span class="arr">→</span><span class="node">生成章节（先候选后确认）</span><span class="arr">→</span>
+    <span class="node">审查（只读建议）</span><span class="arr">→</span><span class="node">修订批次</span><span class="arr">→</span><span class="node">导出 Word / PDF</span>
+  </div>
+  <pre><code>用户：创建一篇目标 30000 字的硕士论文项目，题目为"面向论文写作的混合检索方法研究"。
+      我暂时没有参考论文，请先生成默认大纲与行文逻辑，不要生成正文。
+用户：生成系统设计章节。          ← 系统先提交生成范围候选，你确认后才落笔
+用户：请扫描目录 D:\我的论文资料 并将论文导入为参考材料。   ← 开启证据约束
+用户：用 SiliconFlow 的 bge-m3 向量模型，Key 是 sk-xxx    ← 配置真实 Embedding（可选）
+用户：让审查 Agent 看看，然后导出 Word 和 PDF</code></pre>
+  <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
+    无证据处会写入 <code>[待补充证据]</code> 占位，禁止捏造数字与文献；正文按段落块保存，支持命名快照 / 块级 diff / 恢复。
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">1.3 工具与配置速查</h3>
+  <table>
+    <tr><th>环节</th><th>代表工具</th></tr>
+    <tr><td>项目与规划</td><td><code>thesis_create_project</code> · <code>thesis_set_plan</code> · <code>thesis_apply_default_master_template</code> · <code>thesis_import_reference_template</code></td></tr>
+    <tr><td>材料与证据</td><td><code>thesis_scan_directory</code> · <code>thesis_import_source_file</code> · <code>thesis_search_sources</code> · <code>thesis_build_evidence_package</code> · <code>thesis_bind_block_sources</code></td></tr>
+    <tr><td>受控生成</td><td><code>thesis_prepare_generation</code> → <code>thesis_confirm_generation</code> → <code>thesis_submit_generated_scope</code> → <code>thesis_decide_generated_scope</code></td></tr>
+    <tr><td>审查修订</td><td>审查 Agent 只读提交 <code>thesis_submit_review_suggestions</code> → 逐条接受/拒绝 → <code>thesis_create_revision_batch</code></td></tr>
+    <tr><td>版本质量</td><td>命名快照 / 块级 diff / 无损恢复 · <code>thesis_run_quality_checks</code> · 导出前门禁检查</td></tr>
+    <tr><td>导出</td><td><code>thesis_export_current_docx</code> · <code>thesis_export_current_latex</code>（<code>compilePdf=true</code>）· GB/T 7714 / APA</td></tr>
+  </table>
+  <h3>可选配置</h3>
+  <table>
+    <tr><th>项</th><th>方式</th></tr>
+    <tr><td>真实 Embedding</td><td>对话一句指令（内置 deepseek/openai/qwen/zhipu/siliconflow/ollama 六家预设），或工作台「设置」tab 配置；API Key 仅存进程内存，可用 <code>apiKeyEnv</code> 指向环境变量</td></tr>
+    <tr><td>XeLaTeX（PDF 编译）</td><td><code>$env:THESIS_XELATEX_PATH = "D:\texlive\...\xelatex.exe"</code> 后再 <code>dsh web</code></td></tr>
+    <tr><td>SQLite 存储</td><td><code>THESIS_STORAGE=sqlite</code>（缺依赖自动降级 JSON）</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">测试验证：<code>npm test</code>（165 pass / 0 fail / 3 skip）· <code>npm run check</code> · <code>npm run verify</code> · <code>npm audit</code>（0 漏洞）</p>
+</div>
+
+<h2>2 · 项目二：workbench-core（可插拔工作台框架）</h2>
+
+<div class="card">
+  <h3 style="margin-top:0;">2.1 安装与启动</h3>
+  <pre><code># 在 D:\雷达毕设相关\high_star\workbench-core 目录下
+npm install                          # ① 装依赖（已装可跳过）
+dsh plugin --profile web add .       # ② 注册插件
+# ③ 重启 DSH（重要：注册后需重启才生效）</code></pre>
+  <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
+    启动后通过 DSH 对话使用，工作台 UI 同样在 http://127.0.0.1:3199（由 <code>wb_open_workbench</code> 打开）。
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">2.2 典型使用路径（对话驱动）</h3>
+  <pre><code>用户：打开工作台
+DSH：wb_open_workbench → http://127.0.0.1:3199
+
+用户：创建一个论文项目，关于毫米波雷达水分检测
+DSH：wb_create_project({ name: "毫米波雷达水分检测", taskType: "thesis" })
+
+用户：创建一个专利项目，关于一种新的检测装置
+DSH：wb_create_project({ name: "新型检测装置", taskType: "patent" })</code></pre>
+  <h3>核心亮点：生成新任务类型插件包</h3>
+  <pre><code>用户：基于论文工作台架构，帮我生成一个面向法律合同审查的工作台
+DSH：wb_analyze_task_description({ description: "法律合同审查" }) → detectedType: "contract"
+DSH：wb_generate_plugin_bundle({ taskType: "contract", name: "Contract Workbench" })
+     → 生成 ./generated-plugins/contract-workbench/</code></pre>
+  <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
+    生成器只会在 <code>generated-plugins/&lt;taskType&gt;-workbench/</code> 创建新包，<b>不会改 workbench-core 源码</b>；
+    每个包含 <code>plugin-spec.json</code>（领域唯一配置来源）、<code>plugin.manifest.json</code>、读取 spec 的 <code>src/index.js</code>、安装前静态校验脚本 <code>scripts/verify.mjs</code>。
+    生成后自动执行静态验证，也可 <code>wb_verify_generated_plugin_bundle</code> 复查；通过后再按包内 README 安装。
+    工作台右侧「规格」页提供 Spec Studio：新建草案 → 编辑 JSON → 校验 → 生成隔离插件包。
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">2.3 工具速查（wb_*）</h3>
+  <table>
+    <tr><th>分组</th><th>工具</th></tr>
+    <tr><td>项目管理</td><td><code>wb_list_projects</code> · <code>wb_create_project</code> · <code>wb_delete_project</code> · <code>wb_bind_project</code> · <code>wb_get_workbench</code></td></tr>
+    <tr><td>大纲正文</td><td><code>wb_set_outline</code> · <code>wb_set_manuscript</code> · <code>wb_set_domain_fields</code> · <code>wb_add_material</code> · <code>wb_import_material_file</code></td></tr>
+    <tr><td>状态机运行</td><td><code>wb_create_run</code> · <code>wb_get_run</code> · <code>wb_advance_run</code>（必须用 <code>recommendedNextEvent</code>）· <code>wb_cancel_run</code></td></tr>
+    <tr><td>模板 / 重生成</td><td><code>wb_list_templates</code> · <code>wb_save_template</code> · <code>wb_request_regeneration</code> · <code>wb_list_regeneration_requests</code></td></tr>
+    <tr><td>插件系统</td><td><code>wb_list_task_types</code> · <code>wb_list_plugins</code> · <code>wb_analyze_task_description</code> · <code>wb_generate_plugin_bundle</code> · <code>wb_verify_generated_plugin_bundle</code> · <code>wb_list_plugin_bundles</code> · <code>wb_create_plugin_spec_draft</code> · <code>wb_validate_plugin_spec</code></td></tr>
+    <tr><td>UI</td><td><code>wb_open_workbench</code></td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--muted);margin:4px 0 0;">测试验证：<code>npm test</code>（18 项核心测试）· <code>npm run check</code>（语法检查）</p>
+</div>
+
+<h2>3 · 两项目对比</h2>
+<div class="card" style="padding:12px 18px;">
+  <table>
+    <tr><th>维度</th><th>dsh-thesis-agent（v1.x）</th><th>dsh-workbench-core（v2.0）</th></tr>
+    <tr><td>定位</td><td>论文专用插件</td><td>可插拔框架 + 内置论文/专利插件</td></tr>
+    <tr><td>状态机</td><td>固定 11 状态</td><td>可配置，由 Framework 插件定义（论文 13 / 专利 12）</td></tr>
+    <tr><td>大纲 / 引用</td><td>论文 5 章固定 · GB/T 7714 固定</td><td>由 Framework / Evidence 插件定义，支持多种格式</td></tr>
+    <tr><td>新任务类型</td><td>需改核心代码</td><td>LLM 一键生成插件包</td></tr>
+    <tr><td>工作台 UI</td><td>论文专用（双区 4:3 可拖拽）</td><td>通用双区 4:3 可拖拽，随 spec 显示领域术语</td></tr>
+    <tr><td>工具前缀</td><td>65 个 <code>thesis_*</code></td><td>20+ 个 <code>wb_*</code></td></tr>
+    <tr><td>测试</td><td>165 项</td><td>18 项</td></tr>
+  </table>
+</div>
+
+<h2>4 · 注意事项（重要）</h2>
+<div class="warn">
+  <b>① 端口冲突：</b>两个项目的工作台默认都监听 <code>127.0.0.1:3199</code>，同时注册并启用会端口冲突（EADDRINUSE）。
+  建议同一时间只启用一个插件；若必须并存，可改端口（两个项目均支持 <code>options.port</code> 参数，如改为 3200）。
+</div>
+<div class="warn">
+  <b>② 注册互斥与重启：</b>两个插件都注册到同一个 <code>--profile web</code>。切换使用时：
+  在目标项目目录执行 <code>dsh plugin --profile web add .</code>（必要时先 <code>remove</code> 另一个），然后<b>重启 DSH</b>。
+</div>
+<div class="warn">
+  <b>③ 数据目录：</b>thesis-agent 数据默认持久化在 <code>~/.dsh/storages/thesis-agent/state.json</code>（可切 SQLite）；
+  删除 / 重装插件前如需保留论文进度，先备份该文件。
+</div>
+<div class="warn">
+  <b>④ API Key 不落盘：</b>Embedding Key 仅存进程内存，DSH 重启后需重新填写，可用 <code>apiKeyEnv</code> 指向环境变量规避。
+</div>
+<div class="ok">
+  <b>⑤ 最快上手建议：</b>写论文用 thesis-agent（证据约束 + 导出保真更适合毕设场景）；
+  workbench-core 适合「探索框架能力 / 同时要专利或合同写作」时切换体验，或用它自研新任务类型。
+</div>
+
+<footer>生成于 2026-09-06 · 内容依据两个项目根目录 README 与源码核验 · MIT</footer>
+</div>
+</body>
+</html>

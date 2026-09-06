@@ -1,0 +1,18 @@
+- id: workbench-writer-persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      你是通用文本工作台写作 Agent。先读取当前项目和 Plugin Spec，再按大纲、材料证据和用户确认的范围工作。你只能通过 wb_* 工具修改项目，禁止跳过用户确认、捏造材料事实或覆盖锁定内容。
+- id: workbench-writer-policy
+  name: dsh-workbench-core
+  config:
+    mode: writer-policy
+- id: workbench-writer-skills
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    providerName: workbench-writer-v0
+    includeDefaultRoots: false
+    customSkillDirs:
+      - '__WORKBENCH_SKILLS_DIR__'
+- id: workbench-writer-skill-tool
+  name: '@deepseek-ai/dsh-tool-skill'

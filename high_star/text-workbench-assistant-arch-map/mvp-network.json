@@ -1,0 +1,584 @@
+{
+  "nodes": [
+    {
+      "id": "text-workbench-assistant",
+      "canonicalName": "文本生成工作台助手架构",
+      "shortFact": "dsh-text-workbench-assistant 是面向 DSH 的统一文本生成工作台 Agent 预设，负责自然语言交互与 design/write/review 阶段编排，确定性执行委托给 dsh-workbench-core。",
+      "nodeType": "domain",
+      "parentId": "",
+      "domainId": "twa-entry",
+      "order": 0
+    },
+    {
+      "id": "twa-entry",
+      "canonicalName": "DSH 预设组合",
+      "shortFact": "agent.cordis.yml 组合 Persona、assistant-policy、技能文件系统等插件实例，构成唯一助手预设",
+      "nodeType": "domain",
+      "parentId": "text-workbench-assistant",
+      "domainId": "twa-entry",
+      "order": 1
+    },
+    {
+      "id": "twa-persona",
+      "canonicalName": "Persona 与阶段编排",
+      "shortFact": "统一助手人格与 design/write/review 三阶段编排、恢复绑定与项目上限治理",
+      "nodeType": "domain",
+      "parentId": "text-workbench-assistant",
+      "domainId": "twa-persona",
+      "order": 2
+    },
+    {
+      "id": "twa-skill",
+      "canonicalName": "协作 Skill 治理",
+      "shortFact": "skills/text-workbench/SKILL.md 定义总则、三阶段规则与页面持久化归档规则",
+      "nodeType": "domain",
+      "parentId": "text-workbench-assistant",
+      "domainId": "twa-skill",
+      "order": 3
+    },
+    {
+      "id": "twa-install",
+      "canonicalName": "安装与交付",
+      "shortFact": "preset.yml、install-assets.mjs 安装器与 DSH 预设安装目标的交付链路",
+      "nodeType": "domain",
+      "parentId": "text-workbench-assistant",
+      "domainId": "twa-install",
+      "order": 4
+    },
+    {
+      "id": "twa-runtime",
+      "canonicalName": "workbench-core 运行依赖",
+      "shortFact": "dsh-workbench-core 在 assistant-policy 模式下提供 wb_* 工具与核心运行时",
+      "nodeType": "domain",
+      "parentId": "text-workbench-assistant",
+      "domainId": "twa-runtime",
+      "order": 5
+    },
+    {
+      "id": "twa-test",
+      "canonicalName": "验证与测试",
+      "shortFact": "install.test.js 与 package.test.js 守护安装器与预设包结构",
+      "nodeType": "domain",
+      "parentId": "text-workbench-assistant",
+      "domainId": "twa-test",
+      "order": 6
+    },
+    {
+      "id": "twa-entry-composition",
+      "canonicalName": "agent.cordis.yml",
+      "shortFact": "DSH 组合文件，声明四个插件实例与 __TEXT_WORKBENCH_SKILLS_DIR__ 占位符",
+      "nodeType": "component",
+      "parentId": "twa-entry",
+      "domainId": "twa-entry",
+      "order": 10
+    },
+    {
+      "id": "twa-entry-persona",
+      "canonicalName": "Persona 插件实例",
+      "shortFact": "@deepseek-ai/dsh-persona 实例，注入统一助手人格与三阶段行为约束",
+      "nodeType": "component",
+      "parentId": "twa-entry",
+      "domainId": "twa-entry",
+      "order": 11
+    },
+    {
+      "id": "twa-entry-policy",
+      "canonicalName": "策略插件实例",
+      "shortFact": "dsh-workbench-core 以 mode: assistant-policy 挂载为策略插件",
+      "nodeType": "component",
+      "parentId": "twa-entry",
+      "domainId": "twa-entry",
+      "order": 12
+    },
+    {
+      "id": "twa-entry-skillfiles",
+      "canonicalName": "技能文件系统插件",
+      "shortFact": "@deepseek-ai/dsh-skill-filesystem 实例，以 providerName 装载自定义技能目录",
+      "nodeType": "component",
+      "parentId": "twa-entry",
+      "domainId": "twa-entry",
+      "order": 13
+    },
+    {
+      "id": "twa-persona-stage",
+      "canonicalName": "三阶段编排",
+      "shortFact": "design/write/review 三阶段协作流程，阶段切换必须经 wb_set_work_stage 确认",
+      "nodeType": "method",
+      "parentId": "twa-persona",
+      "domainId": "twa-persona",
+      "order": 20
+    },
+    {
+      "id": "twa-persona-resume",
+      "canonicalName": "恢复与绑定",
+      "shortFact": "通过稳定助手键查询上次项目与阶段，经确认后恢复并绑定项目",
+      "nodeType": "method",
+      "parentId": "twa-persona",
+      "domainId": "twa-persona",
+      "order": 21
+    },
+    {
+      "id": "twa-persona-limit",
+      "canonicalName": "项目上限治理",
+      "shortFact": "活跃项目上限 10 个，创建第 11 个前展示最早项目并单独确认归档",
+      "nodeType": "method",
+      "parentId": "twa-persona",
+      "domainId": "twa-persona",
+      "order": 22
+    },
+    {
+      "id": "twa-skill-file",
+      "canonicalName": "text-workbench SKILL.md",
+      "shortFact": "协作技能文件，规定阶段工具调用、证据缺口与确认边界",
+      "nodeType": "component",
+      "parentId": "twa-skill",
+      "domainId": "twa-skill",
+      "order": 30
+    },
+    {
+      "id": "twa-skill-guideline",
+      "canonicalName": "总则五条",
+      "shortFact": "先查阶段、稳定键恢复、确认后切换、只调阶段工具、无来源标记缺口",
+      "nodeType": "method",
+      "parentId": "twa-skill",
+      "domainId": "twa-skill",
+      "order": 31
+    },
+    {
+      "id": "twa-skill-design",
+      "canonicalName": "Design 阶段规则",
+      "shortFact": "创建校验 Plugin Spec，分别取得目录与安装确认，绑定后进入 write",
+      "nodeType": "method",
+      "parentId": "twa-skill",
+      "domainId": "twa-skill",
+      "order": 32
+    },
+    {
+      "id": "twa-skill-write",
+      "canonicalName": "Write 阶段规则",
+      "shortFact": "只导入授权材料，先检索绑定证据，写入携带快照、revision 与 idempotencyKey",
+      "nodeType": "method",
+      "parentId": "twa-skill",
+      "domainId": "twa-skill",
+      "order": 33
+    },
+    {
+      "id": "twa-skill-review",
+      "canonicalName": "Review 阶段规则",
+      "shortFact": "审查结构、证据、引用与版本差异，只输出问题不直接修改正文",
+      "nodeType": "method",
+      "parentId": "twa-skill",
+      "domainId": "twa-skill",
+      "order": 34
+    },
+    {
+      "id": "twa-skill-persist",
+      "canonicalName": "持久化与归档",
+      "shortFact": "页面与对话共享 Core 存储，删除默认可恢复归档，DSH 退出不删项目",
+      "nodeType": "method",
+      "parentId": "twa-skill",
+      "domainId": "twa-skill",
+      "order": 35
+    },
+    {
+      "id": "twa-install-script",
+      "canonicalName": "scripts/install-assets.mjs",
+      "shortFact": "安装器：复制预设资产到 DSH_HOME 并替换技能目录占位符",
+      "nodeType": "component",
+      "parentId": "twa-install",
+      "domainId": "twa-install",
+      "order": 40
+    },
+    {
+      "id": "twa-install-preset",
+      "canonicalName": "preset.yml",
+      "shortFact": "预设元数据：名称、描述与排序，供 DSH 选择助手",
+      "nodeType": "artifact",
+      "parentId": "twa-install",
+      "domainId": "twa-install",
+      "order": 41
+    },
+    {
+      "id": "twa-install-target",
+      "canonicalName": "预设安装目标",
+      "shortFact": "~/.dsh/.agent-presets/text-workbench-assistant-v0，自包含的预设副本",
+      "nodeType": "artifact",
+      "parentId": "twa-install",
+      "domainId": "twa-install",
+      "order": 42
+    },
+    {
+      "id": "twa-install-boundary",
+      "canonicalName": "项目边界",
+      "shortFact": "只含 Persona、Skill 与安装器，不包含 Runtime、项目数据与领域插件代码",
+      "nodeType": "concept",
+      "parentId": "twa-install",
+      "domainId": "twa-install",
+      "order": 43
+    },
+    {
+      "id": "twa-rt-policymode",
+      "canonicalName": "assistant-policy 模式",
+      "shortFact": "workbench-core 以单助手策略模式运行，融合设计、写作与审查能力",
+      "nodeType": "concept",
+      "parentId": "twa-runtime",
+      "domainId": "twa-runtime",
+      "order": 50
+    },
+    {
+      "id": "twa-rt-tools",
+      "canonicalName": "wb_* 工具契约",
+      "shortFact": "get_stage、resume、bind、set_stage、get_project_limit、open 等确定性工具集",
+      "nodeType": "category",
+      "parentId": "twa-runtime",
+      "domainId": "twa-runtime",
+      "order": 51
+    },
+    {
+      "id": "twa-rt-core",
+      "canonicalName": "Core 核心运行时",
+      "shortFact": "workbench-core 的存储、状态机、工作台 HTTP 服务与插件加载",
+      "nodeType": "category",
+      "parentId": "twa-runtime",
+      "domainId": "twa-runtime",
+      "order": 52
+    },
+    {
+      "id": "twa-rt-bundles",
+      "canonicalName": "领域插件生成",
+      "shortFact": "论文、专利等任务台插件由 workbench-core 生成到独立插件目录",
+      "nodeType": "method",
+      "parentId": "twa-runtime",
+      "domainId": "twa-runtime",
+      "order": 53
+    },
+    {
+      "id": "twa-test-install",
+      "canonicalName": "test/install.test.js",
+      "shortFact": "在隔离 DSH_HOME 运行安装器，断言自包含预设与占位符替换",
+      "nodeType": "component",
+      "parentId": "twa-test",
+      "domainId": "twa-test",
+      "order": 60
+    },
+    {
+      "id": "twa-test-package",
+      "canonicalName": "test/package.test.js",
+      "shortFact": "断言预设包含统一助手、assistant-policy 模式与技能关键工具引用",
+      "nodeType": "component",
+      "parentId": "twa-test",
+      "domainId": "twa-test",
+      "order": 61
+    }
+  ],
+  "cardBlocks": [
+    {
+      "nodeId": "text-workbench-assistant",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "面向论文、专利、合同、技术报告等结构化文本任务的统一 DSH Agent 预设。负责自然语言交互与阶段编排；确定性执行、权限、项目、证据、版本与审计由独立的 dsh-workbench-core 插件负责。自身不包含 Workbench Runtime，不保存项目数据，也不生成领域插件代码。"
+    },
+    {
+      "nodeId": "twa-entry",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "以 agent.cordis.yml 声明唯一助手组合：Persona 实例注入人格与行为，dsh-workbench-core 以 assistant-policy 模式挂载策略，技能文件系统插件按 providerName text-workbench-assistant-v0 装载自定义技能目录。该域只做插件组合，不含任何业务逻辑。"
+    },
+    {
+      "nodeId": "twa-persona",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "统一助手人格域：通过 design、write、review 三个明确阶段组织协作，负责恢复上次项目、绑定项目、管理 10 个项目上限与打开工作台。所有确定性操作一律通过 wb_* 工具委托 Core，不直接触碰文件或存储。"
+    },
+    {
+      "nodeId": "twa-skill",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "协作技能治理域：skills/text-workbench/SKILL.md 是 Agent 在三个阶段的行为规则，规定先查阶段、稳定键恢复、确认后切换、只调阶段工具、无来源标记证据缺口，以及页面持久化与可恢复归档。"
+    },
+    {
+      "nodeId": "twa-install",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "安装与交付域：preset.yml 提供助手元数据，scripts/install-assets.mjs 将 agent.cordis.yml、preset.yml 与 skills/ 复制到 DSH 预设目录并替换技能目录占位符。安装器只复制预设资产，不复制或内嵌 Core 源码。"
+    },
+    {
+      "nodeId": "twa-runtime",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "运行依赖域：dsh-workbench-core 是必须单独安装激活的运行依赖，在 assistant-policy 模式下提供 wb_* 工具、项目存储、阶段状态机、工作台 HTTP 服务与领域插件生成能力。本项目只声明依赖，不实现 Core。"
+    },
+    {
+      "nodeId": "twa-test",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "验证测试域：两个 node:test 用例守护交付物——install.test.js 验证安装器在隔离 DSH_HOME 产出自包含预设，package.test.js 验证预设包结构符合统一助手约束，通过 npm test 与 npm run check 执行。"
+    },
+    {
+      "nodeId": "twa-entry-composition",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "DSH 组合文件（源码根目录 agent.cordis.yml），声明四个插件实例：dsh-persona（人格）、dsh-workbench-core mode assistant-policy（策略）、dsh-skill-filesystem（技能装载，customSkillDirs 含 __TEXT_WORKBENCH_SKILLS_DIR__ 占位符）与 dsh-tool-skill。安装器负责把占位符替换为实际技能目录绝对路径。"
+    },
+    {
+      "nodeId": "twa-entry-persona",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "@deepseek-ai/dsh-persona 插件实例，config.text 写入完整助手人格：统一入口、三阶段工作方式、先查阶段再恢复、确认后才切换、只依据授权材料与可追溯证据生成。人格只描述行为，不实现任何工具。"
+    },
+    {
+      "nodeId": "twa-entry-policy",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "dsh-workbench-core 插件以 mode: assistant-policy 挂载为策略插件，将 Core 的治理能力（权限、项目、证据、版本、审计）以单助手策略暴露给 Persona。该实例是本项目与 Core 运行时的唯一接缝。"
+    },
+    {
+      "nodeId": "twa-entry-skillfiles",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "@deepseek-ai/dsh-skill-filesystem 插件实例：providerName 设为 text-workbench-assistant-v0，includeDefaultRoots 关闭，仅从 customSkillDirs 指向的安装后技能目录装载技能，保证助手只加载本项目技能。"
+    },
+    {
+      "nodeId": "twa-persona-stage",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "design/write/review 三阶段协作机制：design 构建领域任务台，write 人机协同生成，review 只读审查与导出。阶段切换必须调用 wb_set_work_stage 并传 userConfirmed: true、稳定助手键与切换原因，任何工具不得绕过当前阶段权限。"
+    },
+    {
+      "nodeId": "twa-persona-stage",
+      "type": "procedure",
+      "title": "运行流程",
+      "text": "1. 用户说明任务类型（论文/专利/合同/报告）；2. design：创建并展示校验 Plugin Spec，取得输出目录确认与插件安装确认；3. 用户指定任务台与项目后调用 wb_bind_project（稳定助手键）并经确认；4. wb_set_work_stage 进入 write；5. write 中按需经确认返回 review；6. review 确认定稿后导出。"
+    },
+    {
+      "nodeId": "twa-persona-resume",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "恢复与绑定机制：开始或恢复任务时先调用 wb_get_work_stage 查询阶段，再用稳定助手键 web:text-workbench-assistant-v0 调用 wb_get_resume_state；发现上次项目时展示项目与阶段，取得确认后才 wb_resume_project 恢复，禁止静默恢复或重复写入。"
+    },
+    {
+      "nodeId": "twa-persona-limit",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "项目上限治理机制：活跃项目最多 10 个。创建第 11 个项目前先调用 wb_get_project_limit，向用户展示将被归档的 createdAt 最早项目，取得单独确认（confirmedEviction: true）后才执行。用户说删除时默认执行可恢复归档，不静默物理销毁。"
+    },
+    {
+      "nodeId": "twa-skill-file",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "协作技能文件（skills/text-workbench/SKILL.md）：总则 5 条 + Design/Write/Review 各节规则 + 页面持久化与归档 6 条。它是 Agent 行为规则的权威来源，被技能文件系统插件装载，指导 Persona 每个阶段允许调用哪些 wb_* 工具。"
+    },
+    {
+      "nodeId": "twa-skill-guideline",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "总则五条：每次开始或恢复先调 wb_get_work_stage；用稳定助手键经 wb_get_resume_state 恢复且确认后才 wb_resume_project；阶段切换必须 wb_set_work_stage 传 userConfirmed；只调用当前阶段允许的工具；未经授权不读材料、无来源标记证据缺口。"
+    },
+    {
+      "nodeId": "twa-skill-design",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "Design 阶段规则：分析任务并创建、展示、校验 Plugin Spec；分别取得输出目录确认与插件安装确认；安装后等待用户指定任务台与项目；创建项目前查上限，达到 10 个时展示最早项目确认后才传 confirmedEviction: true；绑定项目经确认后进入 write。"
+    },
+    {
+      "nodeId": "twa-skill-write",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "Write 阶段规则：读取绑定项目完整工作台状态，只导入用户明确选择的材料；先检索和绑定证据再规划大纲与正文，不得编造出处；重要写入前创建快照并携带预期 revision，长步骤保存 checkpoint 与稳定 idempotencyKey；中断时说明恢复点经确认后恢复，禁止重复写入。"
+    },
+    {
+      "nodeId": "twa-skill-write",
+      "type": "procedure",
+      "title": "运行流程",
+      "text": "1. 读取绑定项目状态并展示；2. 用户选择导入材料；3. 检索并绑定证据，无来源标记缺口；4. 规划大纲与正文，重要写入前 wb_snapshot 创建快照携带 revision；5. 长步骤写 checkpoint + idempotencyKey；6. 检测到中断则说明恢复点，经确认后从 checkpoint 恢复。"
+    },
+    {
+      "nodeId": "twa-skill-review",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "Review 阶段规则：用户要求审查后进入 review，检查结构、领域字段、证据、引用、术语与版本差异，只输出可定位的问题与建议，不直接修改正文；用户要求修改时确认后返回 write；用户确认定稿后再导出。"
+    },
+    {
+      "nodeId": "twa-skill-persist",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "页面持久化与归档规则：未指定项目时 wb_open_workbench({})，指定项目时先绑定再打开；DSH 对话与工作台页面共享同一 Core 存储与项目绑定；DSH 退出不删除项目；删除默认走可恢复归档，确认后才执行。"
+    },
+    {
+      "nodeId": "twa-install-script",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "安装器脚本（scripts/install-assets.mjs）：以 DSH_HOME 或 ~/.dsh 为根，创建 .agent-presets/text-workbench-assistant-v0 目录，复制 agent.cordis.yml、preset.yml、skills/ 三组资产，并把组合文件中的 __TEXT_WORKBENCH_SKILLS_DIR__ 替换为安装后的技能目录绝对路径。不复制 Core 源码。"
+    },
+    {
+      "nodeId": "twa-install-script",
+      "type": "procedure",
+      "title": "运行流程",
+      "text": "1. 解析包根目录与 DSH_HOME（默认 ~/.dsh）；2. 前置校验 agent.cordis.yml、preset.yml、skills/text-workbench/SKILL.md 存在；3. 递归创建 .agent-presets/text-workbench-assistant-v0；4. 复制三个资产；5. 读组合文件，replaceAll 占位符为安装后技能目录；6. 写回并输出安装位置与 Core 依赖提示。"
+    },
+    {
+      "nodeId": "twa-install-preset",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "预设元数据文件（preset.yml）：name 为文本生成工作台助手，description 说明统一协作入口能力（任务台设计、循证写作、审查、版本审计与导出），order: 20 决定助手在 DSH 中的展示排序。"
+    },
+    {
+      "nodeId": "twa-install-target",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "安装目标目录（DSH_HOME/.agent-presets/text-workbench-assistant-v0）：存放安装器产出的自包含预设副本，含 agent.cordis.yml（占位符已替换）、preset.yml 与 skills/。重启 DSH 后可从助手列表选择文本生成工作台助手。"
+    },
+    {
+      "nodeId": "twa-install-boundary",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "项目边界概念：本项目只包含 Agent Persona、Skill 与预设安装器；不包含 Workbench Runtime，不保存项目数据，不生成领域插件代码；workbench-core 是运行依赖必须单独安装激活；生成的领域任务台插件位于 ~/.dsh/workbench-plugins/ 或用户确认的其他独立目录。"
+    },
+    {
+      "nodeId": "twa-rt-policymode",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "assistant-policy 是 workbench-core 的策略运行模式：以单个统一助手（而非 Designer/Writer/Reviewer 三类分离角色）暴露治理能力，与 package.test.js 断言的不含 designer-policy/writer-policy/reviewer-policy 约束一致。"
+    },
+    {
+      "nodeId": "twa-rt-tools",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "wb_* 工具契约是 Persona 与 Core 之间的确定性接口面：wb_get_work_stage、wb_get_resume_state、wb_resume_project、wb_set_work_stage、wb_bind_project、wb_list_projects、wb_get_project_limit、wb_open_workbench 及快照/检查点/导出等工具。Persona 只能通过这些工具操作项目，不能直接读写文件。"
+    },
+    {
+      "nodeId": "twa-rt-tools",
+      "type": "inputs_outputs",
+      "title": "输入与输出",
+      "text": "输入：阶段查询、恢复状态查询、项目列表/上限查询、项目绑定请求；输出：当前阶段、上次项目与阶段快照、项目绑定结果、活跃项目数、工作台页面。所有调用附带稳定助手键 text-workbench-assistant-v0，写操作要求 userConfirmed 与切换原因。"
+    },
+    {
+      "nodeId": "twa-rt-core",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "workbench-core 核心运行时：JSON 项目存储、可配置状态机、工作台 HTTP 服务、插件加载器与 Plugin Spec 机制，以及材料解析、检索、版本与导出服务。它是确定性执行层，本架构图中的运行依赖域只描述其与本预设的接缝。"
+    },
+    {
+      "nodeId": "twa-rt-bundles",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "领域插件生成机制：workbench-core 依据 design 阶段确认的 Plugin Spec 生成论文、专利等任务台插件包，写入 ~/.dsh/workbench-plugins/ 或用户确认的独立目录；本助手不生成领域插件代码，只编排生成流程。"
+    },
+    {
+      "nodeId": "twa-test-install",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "安装器测试（test/install.test.js）：在临时 DSH_HOME 运行 scripts/install-assets.mjs，断言安装目录生成、组合文件不再含 __TEXT_WORKBENCH_SKILLS_DIR__、含 persona 引用、SKILL.md 含 wb_resume_project，最后清理临时目录。"
+    },
+    {
+      "nodeId": "twa-test-package",
+      "type": "definition",
+      "title": "定义与边界",
+      "text": "预设包测试（test/package.test.js）：断言 preset.yml 与 SKILL.md 存在、组合含 mode: assistant-policy 且不含 designer/writer/reviewer 分离策略、SKILL.md 引用 wb_get_resume_state 与 wb_get_project_limit，守护统一助手结构不被破坏。"
+    }
+  ],
+  "relations": [
+    {
+      "sourceId": "twa-entry",
+      "targetId": "text-workbench-assistant",
+      "type": "PART_OF",
+      "rationale": "DSH 预设组合是助手架构的接入层"
+    },
+    {
+      "sourceId": "twa-persona",
+      "targetId": "text-workbench-assistant",
+      "type": "PART_OF",
+      "rationale": "Persona 与阶段编排是助手架构的交互层"
+    },
+    {
+      "sourceId": "twa-skill",
+      "targetId": "text-workbench-assistant",
+      "type": "PART_OF",
+      "rationale": "协作 Skill 治理是助手架构的规则层"
+    },
+    {
+      "sourceId": "twa-install",
+      "targetId": "text-workbench-assistant",
+      "type": "PART_OF",
+      "rationale": "安装与交付是助手架构的交付层"
+    },
+    {
+      "sourceId": "twa-runtime",
+      "targetId": "text-workbench-assistant",
+      "type": "PART_OF",
+      "rationale": "workbench-core 运行依赖是助手架构的确定性执行层"
+    },
+    {
+      "sourceId": "twa-test",
+      "targetId": "text-workbench-assistant",
+      "type": "PART_OF",
+      "rationale": "验证与测试是助手架构的质量保障层"
+    },
+    {
+      "sourceId": "twa-rt-tools",
+      "targetId": "twa-persona",
+      "type": "INPUT_TO",
+      "rationale": "wb_* 工具契约被 Persona 阶段编排调用"
+    },
+    {
+      "sourceId": "twa-entry-policy",
+      "targetId": "twa-rt-policymode",
+      "type": "IMPLEMENTS",
+      "rationale": "策略插件实例以 assistant-policy 模式挂载 Core 治理能力"
+    },
+    {
+      "sourceId": "twa-entry-skillfiles",
+      "targetId": "twa-skill-file",
+      "type": "INPUT_TO",
+      "rationale": "技能文件系统插件装载协作 SKILL.md"
+    },
+    {
+      "sourceId": "twa-skill-file",
+      "targetId": "twa-persona",
+      "type": "INPUT_TO",
+      "rationale": "协作技能规则指导 Persona 的三阶段行为"
+    },
+    {
+      "sourceId": "twa-persona-resume",
+      "targetId": "twa-persona-stage",
+      "type": "INPUT_TO",
+      "rationale": "先恢复阶段与项目状态，再进入阶段编排"
+    },
+    {
+      "sourceId": "twa-persona-limit",
+      "targetId": "twa-rt-core",
+      "type": "INPUT_TO",
+      "rationale": "项目上限查询与归档确认由 Core 存储执行"
+    },
+    {
+      "sourceId": "twa-rt-core",
+      "targetId": "twa-rt-tools",
+      "type": "PREREQUISITE_OF",
+      "rationale": "核心运行时是 wb_* 工具契约的提供前置"
+    },
+    {
+      "sourceId": "twa-install-script",
+      "targetId": "twa-install-target",
+      "type": "INPUT_TO",
+      "rationale": "安装器写入预设安装目标目录"
+    },
+    {
+      "sourceId": "twa-install-boundary",
+      "targetId": "twa-rt-bundles",
+      "type": "AFFECTS",
+      "rationale": "项目边界决定领域插件生成到独立目录而非本包"
+    },
+    {
+      "sourceId": "twa-install-script",
+      "targetId": "twa-test-install",
+      "type": "EVALUATED_BY",
+      "rationale": "安装器由 install.test.js 在隔离 DSH_HOME 评估"
+    },
+    {
+      "sourceId": "twa-entry-composition",
+      "targetId": "twa-test-package",
+      "type": "EVALUATED_BY",
+      "rationale": "组合结构由 package.test.js 断言守护"
+    }
+  ]
+}

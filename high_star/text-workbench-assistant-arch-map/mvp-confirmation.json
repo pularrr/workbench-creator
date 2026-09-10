@@ -1,0 +1,499 @@
+{
+  "profile": {
+    "id": "text-workbench-arch",
+    "name": "文本生成工作台助手架构图谱",
+    "description": "dsh-text-workbench-assistant DSH Agent 预设架构知识网络，覆盖 DSH 预设组合、Persona 阶段编排、协作 Skill 治理、安装与交付、workbench-core 运行依赖以及验证测试。",
+    "version": "1.0.0",
+    "schemaVersion": "task-profile/1",
+    "domains": [
+      {
+        "id": "twa-entry",
+        "name": "DSH 预设组合",
+        "description": "agent.cordis.yml 组合四个插件实例：Persona、assistant-policy、技能文件系统与技能工具，以及稳定助手键",
+        "visualBranch": "foundation",
+        "order": 10
+      },
+      {
+        "id": "twa-persona",
+        "name": "Persona 与阶段编排",
+        "description": "统一助手人格与 design/write/review 三阶段编排，含恢复、绑定、项目上限与工作台打开机制",
+        "visualBranch": "ai",
+        "order": 20
+      },
+      {
+        "id": "twa-skill",
+        "name": "协作 Skill 治理",
+        "description": "skills/text-workbench/SKILL.md 的阶段规则：总则、Design/Write/Review 规则与页面持久化归档",
+        "visualBranch": "system",
+        "order": 30
+      },
+      {
+        "id": "twa-install",
+        "name": "安装与交付",
+        "description": "preset.yml、install-assets.mjs 安装器、DSH 预设目标目录与领域插件目录的项目边界",
+        "visualBranch": "signal",
+        "order": 40
+      },
+      {
+        "id": "twa-runtime",
+        "name": "workbench-core 运行依赖",
+        "description": "dsh-workbench-core 在 assistant-policy 模式下提供的 wb_* 工具契约、核心运行时与领域插件生成",
+        "visualBranch": "system",
+        "order": 50
+      },
+      {
+        "id": "twa-test",
+        "name": "验证与测试",
+        "description": "install.test.js 与 package.test.js 两个测试用例，以及 npm test / npm run check 验证命令",
+        "visualBranch": "data",
+        "order": 60
+      }
+    ],
+    "visualBranches": [
+      "foundation",
+      "system",
+      "data",
+      "signal",
+      "ai"
+    ],
+    "nodeTypes": [
+      {
+        "type": "domain",
+        "label": "架构域",
+        "singular": "一个架构子系统",
+        "forbidden": [
+          "多个子系统混合"
+        ],
+        "note": "根节点与一级架构域节点，按职责划分",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "category",
+        "label": "模块类别",
+        "singular": "一个可命名的模块类别",
+        "forbidden": [
+          "具体实现细节",
+          "多个分类维度"
+        ],
+        "note": "中间导航节点，按一个稳定维度归组组件",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "problem",
+        "label": "问题",
+        "singular": "一个问题或现象",
+        "forbidden": [
+          "解决方法",
+          "子问题",
+          "多个问题并列"
+        ],
+        "note": "只描述架构要解决的问题本身，解决方法必须是独立节点",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "concept",
+        "label": "架构概念",
+        "singular": "一个架构概念",
+        "forbidden": [
+          "多个并列概念",
+          "方法",
+          "算法"
+        ],
+        "note": "架构设计理念与模式，如对话与确定性执行分离",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "method",
+        "label": "机制/方法",
+        "singular": "一个机制或方法",
+        "forbidden": [
+          "多个机制并列",
+          "问题描述",
+          "概念定义"
+        ],
+        "note": "架构中的工作流机制，如三阶段编排、恢复与绑定",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "algorithm",
+        "label": "算法",
+        "singular": "一个算法",
+        "forbidden": [
+          "多个并列算法",
+          "问题描述"
+        ],
+        "note": "证据检索、哈希等具体算法",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "model",
+        "label": "模型",
+        "singular": "一个模型",
+        "forbidden": [
+          "多个并列模型",
+          "问题描述"
+        ],
+        "note": "数据模型与状态机模型",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "component",
+        "label": "代码组件",
+        "singular": "一个代码模块",
+        "forbidden": [
+          "多个模块并列",
+          "系统"
+        ],
+        "note": "具体源码文件或插件实例，如 agent.cordis.yml、scripts/install-assets.mjs",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "artifact",
+        "label": "制品",
+        "singular": "一个制品",
+        "forbidden": [
+          "多个制品并列"
+        ],
+        "note": "预设资产、安装目标目录、生成的领域插件包等产物",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "parameter",
+        "label": "参数",
+        "singular": "一个参数",
+        "forbidden": [
+          "多个参数并列"
+        ],
+        "note": "稳定助手键、项目上限、版本等配置参数",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "metric",
+        "label": "指标",
+        "singular": "一个指标",
+        "forbidden": [
+          "多个指标并列"
+        ],
+        "note": "活跃项目数、revision 等运行指标",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "application",
+        "label": "应用场景",
+        "singular": "一个应用场景",
+        "forbidden": [
+          "多个场景并列"
+        ],
+        "note": "论文、专利、合同、技术报告等任务类型",
+        "isGranularSensitive": false
+      }
+    ],
+    "edgeTypes": [
+      {
+        "type": "SIMILAR_TO",
+        "label": "相似于",
+        "direction": "symmetric",
+        "description": "两个节点在职责或结构上相似"
+      },
+      {
+        "type": "ALTERNATIVE_TO",
+        "label": "替代于",
+        "direction": "symmetric",
+        "description": "一个节点可以替代另一个节点"
+      },
+      {
+        "type": "PREREQUISITE_OF",
+        "label": "是...的前置",
+        "direction": "directed",
+        "description": "source 是理解或运行 target 的前置"
+      },
+      {
+        "type": "PART_OF",
+        "label": "是...的一部分",
+        "direction": "directed",
+        "description": "source 是 target 的组成部分"
+      },
+      {
+        "type": "INPUT_TO",
+        "label": "输入到/被调用",
+        "direction": "directed",
+        "description": "source 是 target 的输入或被 target 调用"
+      },
+      {
+        "type": "OUTPUT_OF",
+        "label": "是...的输出",
+        "direction": "directed",
+        "description": "source 是 target 的输出产物"
+      },
+      {
+        "type": "USES_MODEL",
+        "label": "使用模型",
+        "direction": "directed",
+        "description": "source 使用 target 的数据模型/状态机"
+      },
+      {
+        "type": "IMPLEMENTS",
+        "label": "实现",
+        "direction": "directed",
+        "description": "source 实现了 target 声明的契约/方法"
+      },
+      {
+        "type": "DERIVED_FROM",
+        "label": "派生自",
+        "direction": "directed",
+        "description": "source 派生自 target（抽象或迁移而来）"
+      },
+      {
+        "type": "AFFECTS",
+        "label": "影响",
+        "direction": "directed",
+        "description": "source 影响 target 的行为或边界"
+      },
+      {
+        "type": "MITIGATES",
+        "label": "缓解",
+        "direction": "directed",
+        "description": "source 机制缓解了 target 问题"
+      },
+      {
+        "type": "EVALUATED_BY",
+        "label": "由...评估",
+        "direction": "directed",
+        "description": "source 由 target 指标/测试评估"
+      }
+    ],
+    "cardSections": [
+      {
+        "type": "definition",
+        "label": "定义与边界",
+        "definition": "说明该模块是什么、负责什么、不做什么，以及与相邻模块的边界。",
+        "coverage": "core",
+        "appliesTo": "all",
+        "order": 10
+      },
+      {
+        "type": "principle",
+        "label": "设计机制",
+        "definition": "解释该模块的机制为何成立、关键因果链、设计依据。",
+        "coverage": "core",
+        "appliesTo": [
+          "problem",
+          "concept",
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "parameter",
+          "metric"
+        ],
+        "order": 20
+      },
+      {
+        "type": "comparison",
+        "label": "同类方案比较",
+        "definition": "在同一职责与评价维度下比较可替代或相似的实现。",
+        "coverage": "conditional",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "metric"
+        ],
+        "order": 40
+      },
+      {
+        "type": "inputs_outputs",
+        "label": "输入与输出",
+        "definition": "明确模块消费与产生的数据、接口签名和语义。",
+        "coverage": "conditional",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "artifact",
+          "application"
+        ],
+        "order": 50
+      },
+      {
+        "type": "procedure",
+        "label": "运行流程",
+        "definition": "给出可执行、有先后关系的调用链或工作流步骤。",
+        "coverage": "core",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "component",
+          "application"
+        ],
+        "order": 60
+      },
+      {
+        "type": "engineering_tradeoff",
+        "label": "工程取舍",
+        "definition": "说明资源、通用性、复杂度、耦合度之间不可同时最优的选择。",
+        "coverage": "core",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "parameter",
+          "application"
+        ],
+        "order": 70
+      },
+      {
+        "type": "validation",
+        "label": "验证方式",
+        "definition": "给出可判定正确性的测试、检查命令与通过标准。",
+        "coverage": "core",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "metric",
+          "application"
+        ],
+        "order": 90
+      },
+      {
+        "type": "code",
+        "label": "关键实现",
+        "definition": "提供能表达核心逻辑的短代码或关键 API 调用。",
+        "coverage": "optional",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "application"
+        ],
+        "order": 120
+      },
+      {
+        "type": "application",
+        "label": "应用场景",
+        "definition": "说明该模块在具体任务或系统链路中的实际用途。",
+        "coverage": "optional",
+        "appliesTo": "all",
+        "order": 100
+      }
+    ],
+    "validation": {
+      "domainCount": 6,
+      "visualBranchCount": 5,
+      "rootNodeRequired": true,
+      "maxPrimaryChildren": 8,
+      "extraRules": [
+        "代码组件节点名称使用源码文件名或插件名，保持与仓库一致",
+        "架构概念节点只表达一个设计理念，禁止混入具体实现",
+        "阶段编排关系优先表达对话层与确定性执行层的边界，如 Persona 调用 wb_* 工具而非直接写存储"
+      ]
+    },
+    "hierarchy": {
+      "enabled": true,
+      "intermediateNodeTypes": [
+        "category"
+      ],
+      "planningThreshold": 6,
+      "maxDepth": 5
+    },
+    "prompts": {
+      "react": "你是采用 ReAct 的代码架构检索 Agent，用于生成 dsh-text-workbench-assistant 架构知识网络。Observe 当前节点及前轮发现；判断覆盖缺口；Act 深入一个尚未覆盖的源码文件、预设资产或架构机制，输出一批实质知识；再观察覆盖度。优先梳理模块职责、依赖方向、调用链与设计理念，再深入实现细节。每个源码文件、预设插件实例、Skill 规则、安装目标与运行依赖按职责拆分为独立节点。新增节点可引用本批或此前批次新节点 ID 作为父级。无法证实的主张说明证据来源（源码路径或文档）。只有连续多轮没有实质新增时才标记收敛。\n\n【节点粒度硬约束】1. 一个节点只放一个东西，由 nodeType 决定。2. 禁止多个并列概念/组件放一个节点。3. problem 节点只描述问题，禁止混入解决方法。4. 节点名称≤15字，禁止并列连词。5. shortFact≤50字。",
+      "review": "审查架构知识的粒度、依赖方向、来源与关系方向；源码中的模块职责、调用关系与 README 描述必须一致；未经核验的结论明确标记。",
+      "finalResponse": "围绕用户的架构问题直接回答，使用 Markdown，说明模块职责、依赖关系和证据来源（源码路径）。",
+      "ingest": {
+        "conversation": "从对话中提取关于架构、模块职责与依赖的结论，标注由谁在何时提出。",
+        "summary": "从代码走查摘要中提取模块清单、调用链与设计决策。",
+        "document": "从 README 与技术文档提取系统分层、模块职责与目录说明。",
+        "paper": "从论文或方案文档提取架构设计理念与工程取舍。"
+      },
+      "topicAppendix": "本知识网络聚焦 dsh-text-workbench-assistant 的代码架构，覆盖 DSH 预设组合、Persona 阶段编排、协作 Skill 治理、安装交付、workbench-core 运行依赖与验证测试，以源码、预设文件与 README 为事实来源。"
+    },
+    "initialization": {
+      "rootNode": {
+        "id": "text-workbench-assistant",
+        "name": "文本生成工作台助手架构",
+        "shortFact": "dsh-text-workbench-assistant 是面向 DSH 的统一文本生成工作台 Agent 预设，负责自然语言交互与 design/write/review 阶段编排，确定性执行委托给 dsh-workbench-core。"
+      },
+      "mvp": {
+        "nodeCount": [
+          18,
+          30
+        ],
+        "reactRounds": [
+          2,
+          3
+        ],
+        "sectionsFilled": [
+          "definition"
+        ],
+        "domainCount": [
+          4,
+          6
+        ],
+        "durationMinutes": [
+          2,
+          5
+        ]
+      },
+      "full": {
+        "nodeCount": [
+          80,
+          120
+        ],
+        "reactRounds": [
+          6,
+          18
+        ],
+        "rootBudgetMinutes": [
+          25,
+          35
+        ],
+        "durationMinutes": [
+          25,
+          40
+        ]
+      }
+    },
+    "createdAt": "2026-09-09T00:00:00.000Z",
+    "updatedAt": "2026-09-09T00:00:00.000Z",
+    "author": "knowmap-plugin",
+    "tags": [
+      "text-workbench-assistant",
+      "DSH",
+      "Agent 预设",
+      "架构图谱",
+      "代码图"
+    ]
+  },
+  "approvedBudget": {
+    "durationMinutes": [
+      25,
+      35
+    ],
+    "visitTopicCount": [
+      80,
+      300
+    ],
+    "maxModelCalls": 4096
+  },
+  "mvpConfirmation": {
+    "confirmed": true,
+    "approvedBudget": {
+      "durationMinutes": [
+        25,
+        35
+      ],
+      "visitTopicCount": [
+        80,
+        300
+      ],
+      "maxModelCalls": 4096
+    },
+    "confirmedAt": "2026-09-09T00:00:00.000Z"
+  }
+}

@@ -1,0 +1,10 @@
+- insert:
+    - id: workbench-core
+      name: dsh-workbench-core
+      config:
+        # This package is a builder/runtime capability, not an always-on UI.
+        # The UI server is started only by wb_open_workbench after an explicit
+        # user request and a project binding.
+        storagePath: ''
+        generatedOutputRoot: ''
+        workbenchPort: 3200

@@ -1,0 +1,2949 @@
+{
+  "topic": "dsh-text-workbench-assistant 项目架构图谱",
+  "profile": {
+    "id": "text-workbench-arch",
+    "name": "文本生成工作台助手架构图谱",
+    "description": "dsh-text-workbench-assistant DSH Agent 预设架构知识网络，覆盖 DSH 预设组合、Persona 阶段编排、协作 Skill 治理、安装与交付、workbench-core 运行依赖以及验证测试。",
+    "version": "1.0.0",
+    "schemaVersion": "task-profile/1",
+    "domains": [
+      {
+        "id": "twa-entry",
+        "name": "DSH 预设组合",
+        "description": "agent.cordis.yml 组合四个插件实例：Persona、assistant-policy、技能文件系统与技能工具，以及稳定助手键",
+        "visualBranch": "foundation",
+        "order": 10
+      },
+      {
+        "id": "twa-persona",
+        "name": "Persona 与阶段编排",
+        "description": "统一助手人格与 design/write/review 三阶段编排，含恢复、绑定、项目上限与工作台打开机制",
+        "visualBranch": "ai",
+        "order": 20
+      },
+      {
+        "id": "twa-skill",
+        "name": "协作 Skill 治理",
+        "description": "skills/text-workbench/SKILL.md 的阶段规则：总则、Design/Write/Review 规则与页面持久化归档",
+        "visualBranch": "system",
+        "order": 30
+      },
+      {
+        "id": "twa-install",
+        "name": "安装与交付",
+        "description": "preset.yml、install-assets.mjs 安装器、DSH 预设目标目录与领域插件目录的项目边界",
+        "visualBranch": "signal",
+        "order": 40
+      },
+      {
+        "id": "twa-runtime",
+        "name": "workbench-core 运行依赖",
+        "description": "dsh-workbench-core 在 assistant-policy 模式下提供的 wb_* 工具契约、核心运行时与领域插件生成",
+        "visualBranch": "system",
+        "order": 50
+      },
+      {
+        "id": "twa-test",
+        "name": "验证与测试",
+        "description": "install.test.js 与 package.test.js 两个测试用例，以及 npm test / npm run check 验证命令",
+        "visualBranch": "data",
+        "order": 60
+      }
+    ],
+    "visualBranches": [
+      "foundation",
+      "system",
+      "data",
+      "signal",
+      "ai"
+    ],
+    "nodeTypes": [
+      {
+        "type": "domain",
+        "label": "架构域",
+        "singular": "一个架构子系统",
+        "forbidden": [
+          "多个子系统混合"
+        ],
+        "note": "根节点与一级架构域节点，按职责划分",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "category",
+        "label": "模块类别",
+        "singular": "一个可命名的模块类别",
+        "forbidden": [
+          "具体实现细节",
+          "多个分类维度"
+        ],
+        "note": "中间导航节点，按一个稳定维度归组组件",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "problem",
+        "label": "问题",
+        "singular": "一个问题或现象",
+        "forbidden": [
+          "解决方法",
+          "子问题",
+          "多个问题并列"
+        ],
+        "note": "只描述架构要解决的问题本身，解决方法必须是独立节点",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "concept",
+        "label": "架构概念",
+        "singular": "一个架构概念",
+        "forbidden": [
+          "多个并列概念",
+          "方法",
+          "算法"
+        ],
+        "note": "架构设计理念与模式，如对话与确定性执行分离",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "method",
+        "label": "机制/方法",
+        "singular": "一个机制或方法",
+        "forbidden": [
+          "多个机制并列",
+          "问题描述",
+          "概念定义"
+        ],
+        "note": "架构中的工作流机制，如三阶段编排、恢复与绑定",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "algorithm",
+        "label": "算法",
+        "singular": "一个算法",
+        "forbidden": [
+          "多个并列算法",
+          "问题描述"
+        ],
+        "note": "证据检索、哈希等具体算法",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "model",
+        "label": "模型",
+        "singular": "一个模型",
+        "forbidden": [
+          "多个并列模型",
+          "问题描述"
+        ],
+        "note": "数据模型与状态机模型",
+        "isGranularSensitive": true
+      },
+      {
+        "type": "component",
+        "label": "代码组件",
+        "singular": "一个代码模块",
+        "forbidden": [
+          "多个模块并列",
+          "系统"
+        ],
+        "note": "具体源码文件或插件实例，如 agent.cordis.yml、scripts/install-assets.mjs",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "artifact",
+        "label": "制品",
+        "singular": "一个制品",
+        "forbidden": [
+          "多个制品并列"
+        ],
+        "note": "预设资产、安装目标目录、生成的领域插件包等产物",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "parameter",
+        "label": "参数",
+        "singular": "一个参数",
+        "forbidden": [
+          "多个参数并列"
+        ],
+        "note": "稳定助手键、项目上限、版本等配置参数",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "metric",
+        "label": "指标",
+        "singular": "一个指标",
+        "forbidden": [
+          "多个指标并列"
+        ],
+        "note": "活跃项目数、revision 等运行指标",
+        "isGranularSensitive": false
+      },
+      {
+        "type": "application",
+        "label": "应用场景",
+        "singular": "一个应用场景",
+        "forbidden": [
+          "多个场景并列"
+        ],
+        "note": "论文、专利、合同、技术报告等任务类型",
+        "isGranularSensitive": false
+      }
+    ],
+    "edgeTypes": [
+      {
+        "type": "SIMILAR_TO",
+        "label": "相似于",
+        "direction": "symmetric",
+        "description": "两个节点在职责或结构上相似"
+      },
+      {
+        "type": "ALTERNATIVE_TO",
+        "label": "替代于",
+        "direction": "symmetric",
+        "description": "一个节点可以替代另一个节点"
+      },
+      {
+        "type": "PREREQUISITE_OF",
+        "label": "是...的前置",
+        "direction": "directed",
+        "description": "source 是理解或运行 target 的前置"
+      },
+      {
+        "type": "PART_OF",
+        "label": "是...的一部分",
+        "direction": "directed",
+        "description": "source 是 target 的组成部分"
+      },
+      {
+        "type": "INPUT_TO",
+        "label": "输入到/被调用",
+        "direction": "directed",
+        "description": "source 是 target 的输入或被 target 调用"
+      },
+      {
+        "type": "OUTPUT_OF",
+        "label": "是...的输出",
+        "direction": "directed",
+        "description": "source 是 target 的输出产物"
+      },
+      {
+        "type": "USES_MODEL",
+        "label": "使用模型",
+        "direction": "directed",
+        "description": "source 使用 target 的数据模型/状态机"
+      },
+      {
+        "type": "IMPLEMENTS",
+        "label": "实现",
+        "direction": "directed",
+        "description": "source 实现了 target 声明的契约/方法"
+      },
+      {
+        "type": "DERIVED_FROM",
+        "label": "派生自",
+        "direction": "directed",
+        "description": "source 派生自 target（抽象或迁移而来）"
+      },
+      {
+        "type": "AFFECTS",
+        "label": "影响",
+        "direction": "directed",
+        "description": "source 影响 target 的行为或边界"
+      },
+      {
+        "type": "MITIGATES",
+        "label": "缓解",
+        "direction": "directed",
+        "description": "source 机制缓解了 target 问题"
+      },
+      {
+        "type": "EVALUATED_BY",
+        "label": "由...评估",
+        "direction": "directed",
+        "description": "source 由 target 指标/测试评估"
+      }
+    ],
+    "cardSections": [
+      {
+        "type": "definition",
+        "label": "定义与边界",
+        "definition": "说明该模块是什么、负责什么、不做什么，以及与相邻模块的边界。",
+        "coverage": "core",
+        "appliesTo": "all",
+        "order": 10
+      },
+      {
+        "type": "principle",
+        "label": "设计机制",
+        "definition": "解释该模块的机制为何成立、关键因果链、设计依据。",
+        "coverage": "core",
+        "appliesTo": [
+          "problem",
+          "concept",
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "parameter",
+          "metric"
+        ],
+        "order": 20
+      },
+      {
+        "type": "comparison",
+        "label": "同类方案比较",
+        "definition": "在同一职责与评价维度下比较可替代或相似的实现。",
+        "coverage": "conditional",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "metric"
+        ],
+        "order": 40
+      },
+      {
+        "type": "inputs_outputs",
+        "label": "输入与输出",
+        "definition": "明确模块消费与产生的数据、接口签名和语义。",
+        "coverage": "conditional",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "artifact",
+          "application"
+        ],
+        "order": 50
+      },
+      {
+        "type": "procedure",
+        "label": "运行流程",
+        "definition": "给出可执行、有先后关系的调用链或工作流步骤。",
+        "coverage": "core",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "component",
+          "application"
+        ],
+        "order": 60
+      },
+      {
+        "type": "engineering_tradeoff",
+        "label": "工程取舍",
+        "definition": "说明资源、通用性、复杂度、耦合度之间不可同时最优的选择。",
+        "coverage": "core",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "parameter",
+          "application"
+        ],
+        "order": 70
+      },
+      {
+        "type": "validation",
+        "label": "验证方式",
+        "definition": "给出可判定正确性的测试、检查命令与通过标准。",
+        "coverage": "core",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "metric",
+          "application"
+        ],
+        "order": 90
+      },
+      {
+        "type": "code",
+        "label": "关键实现",
+        "definition": "提供能表达核心逻辑的短代码或关键 API 调用。",
+        "coverage": "optional",
+        "appliesTo": [
+          "method",
+          "algorithm",
+          "model",
+          "component",
+          "application"
+        ],
+        "order": 120
+      },
+      {
+        "type": "application",
+        "label": "应用场景",
+        "definition": "说明该模块在具体任务或系统链路中的实际用途。",
+        "coverage": "optional",
+        "appliesTo": "all",
+        "order": 100
+      }
+    ],
+    "validation": {
+      "domainCount": 6,
+      "visualBranchCount": 5,
+      "rootNodeRequired": true,
+      "maxPrimaryChildren": 8,
+      "extraRules": [
+        "代码组件节点名称使用源码文件名或插件名，保持与仓库一致",
+        "架构概念节点只表达一个设计理念，禁止混入具体实现",
+        "阶段编排关系优先表达对话层与确定性执行层的边界，如 Persona 调用 wb_* 工具而非直接写存储"
+      ]
+    },
+    "hierarchy": {
+      "enabled": true,
+      "intermediateNodeTypes": [
+        "category"
+      ],
+      "planningThreshold": 6,
+      "maxDepth": 5
+    },
+    "prompts": {
+      "react": "你是采用 ReAct 的代码架构检索 Agent，用于生成 dsh-text-workbench-assistant 架构知识网络。Observe 当前节点及前轮发现；判断覆盖缺口；Act 深入一个尚未覆盖的源码文件、预设资产或架构机制，输出一批实质知识；再观察覆盖度。优先梳理模块职责、依赖方向、调用链与设计理念，再深入实现细节。每个源码文件、预设插件实例、Skill 规则、安装目标与运行依赖按职责拆分为独立节点。新增节点可引用本批或此前批次新节点 ID 作为父级。无法证实的主张说明证据来源（源码路径或文档）。只有连续多轮没有实质新增时才标记收敛。\n\n【节点粒度硬约束】1. 一个节点只放一个东西，由 nodeType 决定。2. 禁止多个并列概念/组件放一个节点。3. problem 节点只描述问题，禁止混入解决方法。4. 节点名称≤15字，禁止并列连词。5. shortFact≤50字。",
+      "review": "审查架构知识的粒度、依赖方向、来源与关系方向；源码中的模块职责、调用关系与 README 描述必须一致；未经核验的结论明确标记。",
+      "finalResponse": "围绕用户的架构问题直接回答，使用 Markdown，说明模块职责、依赖关系和证据来源（源码路径）。",
+      "ingest": {
+        "conversation": "从对话中提取关于架构、模块职责与依赖的结论，标注由谁在何时提出。",
+        "summary": "从代码走查摘要中提取模块清单、调用链与设计决策。",
+        "document": "从 README 与技术文档提取系统分层、模块职责与目录说明。",
+        "paper": "从论文或方案文档提取架构设计理念与工程取舍。"
+      },
+      "topicAppendix": "本知识网络聚焦 dsh-text-workbench-assistant 的代码架构，覆盖 DSH 预设组合、Persona 阶段编排、协作 Skill 治理、安装交付、workbench-core 运行依赖与验证测试，以源码、预设文件与 README 为事实来源。"
+    },
+    "initialization": {
+      "rootNode": {
+        "id": "text-workbench-assistant",
+        "name": "文本生成工作台助手架构",
+        "shortFact": "dsh-text-workbench-assistant 是面向 DSH 的统一文本生成工作台 Agent 预设，负责自然语言交互与 design/write/review 阶段编排，确定性执行委托给 dsh-workbench-core。"
+      },
+      "mvp": {
+        "nodeCount": [
+          18,
+          30
+        ],
+        "reactRounds": [
+          2,
+          3
+        ],
+        "sectionsFilled": [
+          "definition"
+        ],
+        "domainCount": [
+          4,
+          6
+        ],
+        "durationMinutes": [
+          2,
+          5
+        ]
+      },
+      "full": {
+        "nodeCount": [
+          80,
+          120
+        ],
+        "visitTopicCount": [
+          80,
+          300
+        ],
+        "maxModelCalls": 4096,
+        "reactRounds": [
+          6,
+          18
+        ],
+        "rootBudgetMinutes": [
+          25,
+          35
+        ],
+        "durationMinutes": [
+          25,
+          35
+        ]
+      }
+    },
+    "createdAt": "2026-09-09T00:00:00.000Z",
+    "updatedAt": "2026-09-09T00:00:00.000Z",
+    "author": "knowmap-plugin",
+    "tags": [
+      "text-workbench-assistant",
+      "DSH",
+      "Agent 预设",
+      "架构图谱",
+      "代码图"
+    ]
+  },
+  "network": {
+    "nodes": [
+      {
+        "id": "text-workbench-assistant",
+        "canonicalName": "文本生成工作台助手架构",
+        "shortFact": "面向 DSH 的统一文本生成工作台 Agent 预设，负责交互与阶段编排，确定性执行委托给 dsh-workbench-core。",
+        "nodeType": "domain",
+        "parentId": "",
+        "domainId": "twa-entry",
+        "order": 0
+      },
+      {
+        "id": "twa-entry",
+        "canonicalName": "DSH 预设组合",
+        "shortFact": "agent.cordis.yml 组合 Persona、assistant-policy、技能文件系统与技能工具插件实例。",
+        "nodeType": "domain",
+        "parentId": "text-workbench-assistant",
+        "domainId": "twa-entry",
+        "order": 1
+      },
+      {
+        "id": "twa-persona",
+        "canonicalName": "Persona 与阶段编排",
+        "shortFact": "统一助手人格与 design/write/review 三阶段编排、恢复绑定与项目生命周期治理。",
+        "nodeType": "domain",
+        "parentId": "text-workbench-assistant",
+        "domainId": "twa-persona",
+        "order": 2
+      },
+      {
+        "id": "twa-skill",
+        "canonicalName": "协作 Skill 治理",
+        "shortFact": "SKILL.md 定义总则、阶段门、授权边界与持久化归档规则，并暴露治理问题。",
+        "nodeType": "domain",
+        "parentId": "text-workbench-assistant",
+        "domainId": "twa-skill",
+        "order": 3
+      },
+      {
+        "id": "twa-install",
+        "canonicalName": "安装与交付",
+        "shortFact": "preset.yml、install-assets.mjs、预设安装目标与打包发布的交付链路。",
+        "nodeType": "domain",
+        "parentId": "text-workbench-assistant",
+        "domainId": "twa-install",
+        "order": 4
+      },
+      {
+        "id": "twa-runtime",
+        "canonicalName": "workbench-core 运行依赖",
+        "shortFact": "dsh-workbench-core 在 assistant-policy 模式下提供 wb_* 工具、核心运行时与领域插件生成。",
+        "nodeType": "domain",
+        "parentId": "text-workbench-assistant",
+        "domainId": "twa-runtime",
+        "order": 5
+      },
+      {
+        "id": "twa-test",
+        "canonicalName": "验证与测试",
+        "shortFact": "install.test.js 与 package.test.js 守护安装器与预设包结构，npm 命令执行。",
+        "nodeType": "domain",
+        "parentId": "text-workbench-assistant",
+        "domainId": "twa-test",
+        "order": 6
+      },
+      {
+        "id": "twa-entry-compose",
+        "canonicalName": "组合文件与标识",
+        "shortFact": "组合文件、稳定助手键与 providerName 等预设身份标识。",
+        "nodeType": "category",
+        "parentId": "twa-entry",
+        "domainId": "twa-entry",
+        "order": 10
+      },
+      {
+        "id": "twa-entry-plugins",
+        "canonicalName": "插件实例",
+        "shortFact": "persona、policy、skill-filesystem、tool-skill 四个插件实例。",
+        "nodeType": "category",
+        "parentId": "twa-entry",
+        "domainId": "twa-entry",
+        "order": 11
+      },
+      {
+        "id": "twa-entry-composition",
+        "canonicalName": "agent.cordis.yml",
+        "shortFact": "DSH 组合文件，声明四个插件实例与技能目录占位符。",
+        "nodeType": "component",
+        "parentId": "twa-entry-compose",
+        "domainId": "twa-entry",
+        "order": 12
+      },
+      {
+        "id": "twa-entry-stablekey",
+        "canonicalName": "稳定助手键",
+        "shortFact": "web:text-workbench-assistant-v0，跨会话标识本助手用于恢复与绑定。",
+        "nodeType": "parameter",
+        "parentId": "twa-entry-compose",
+        "domainId": "twa-entry",
+        "order": 13
+      },
+      {
+        "id": "twa-entry-provider",
+        "canonicalName": "providerName 标识",
+        "shortFact": "text-workbench-assistant-v0 作为技能文件系统 providerName。",
+        "nodeType": "parameter",
+        "parentId": "twa-entry-compose",
+        "domainId": "twa-entry",
+        "order": 14
+      },
+      {
+        "id": "twa-entry-persona",
+        "canonicalName": "Persona 插件实例",
+        "shortFact": "@deepseek-ai/dsh-persona 实例，注入统一助手人格与行为约束。",
+        "nodeType": "component",
+        "parentId": "twa-entry-plugins",
+        "domainId": "twa-entry",
+        "order": 15
+      },
+      {
+        "id": "twa-entry-policy",
+        "canonicalName": "策略插件实例",
+        "shortFact": "dsh-workbench-core 以 mode: assistant-policy 挂载为策略插件。",
+        "nodeType": "component",
+        "parentId": "twa-entry-plugins",
+        "domainId": "twa-entry",
+        "order": 16
+      },
+      {
+        "id": "twa-entry-skillfiles",
+        "canonicalName": "技能文件系统插件",
+        "shortFact": "@deepseek-ai/dsh-skill-filesystem 实例，按 providerName 装载自定义技能目录。",
+        "nodeType": "component",
+        "parentId": "twa-entry-plugins",
+        "domainId": "twa-entry",
+        "order": 17
+      },
+      {
+        "id": "twa-entry-skilltool",
+        "canonicalName": "技能工具插件",
+        "shortFact": "@deepseek-ai/dsh-tool-skill 实例，把技能声明为可调用工具。",
+        "nodeType": "component",
+        "parentId": "twa-entry-plugins",
+        "domainId": "twa-entry",
+        "order": 18
+      },
+      {
+        "id": "twa-persona-stages",
+        "canonicalName": "阶段编排",
+        "shortFact": "design/write/review 三阶段及子机制。",
+        "nodeType": "category",
+        "parentId": "twa-persona",
+        "domainId": "twa-persona",
+        "order": 20
+      },
+      {
+        "id": "twa-persona-recovery",
+        "canonicalName": "恢复与绑定",
+        "shortFact": "阶段查询、恢复状态、项目绑定与列举机制。",
+        "nodeType": "category",
+        "parentId": "twa-persona",
+        "domainId": "twa-persona",
+        "order": 21
+      },
+      {
+        "id": "twa-persona-lifecycle",
+        "canonicalName": "项目生命周期",
+        "shortFact": "项目上限、最早归档、可恢复归档与工作台打开。",
+        "nodeType": "category",
+        "parentId": "twa-persona",
+        "domainId": "twa-persona",
+        "order": 22
+      },
+      {
+        "id": "twa-app-scenarios",
+        "canonicalName": "结构化文本任务场景",
+        "shortFact": "论文、专利、合同、技术报告四类任务台场景。",
+        "nodeType": "application",
+        "parentId": "twa-persona",
+        "domainId": "twa-persona",
+        "order": 23
+      },
+      {
+        "id": "twa-persona-stage",
+        "canonicalName": "三阶段编排",
+        "shortFact": "design/write/review 协作主流程，阶段切换须经确认。",
+        "nodeType": "method",
+        "parentId": "twa-persona-stages",
+        "domainId": "twa-persona",
+        "order": 24
+      },
+      {
+        "id": "twa-stage-switch-confirm",
+        "canonicalName": "阶段切换确认",
+        "shortFact": "wb_set_work_stage 需 userConfirmed、稳定键与切换原因。",
+        "nodeType": "method",
+        "parentId": "twa-persona-stage",
+        "domainId": "twa-persona",
+        "order": 25
+      },
+      {
+        "id": "twa-design-flow",
+        "canonicalName": "design 阶段流程",
+        "shortFact": "分析任务、创建 Plugin Spec、双重确认与绑定项目。",
+        "nodeType": "method",
+        "parentId": "twa-persona-stage",
+        "domainId": "twa-persona",
+        "order": 26
+      },
+      {
+        "id": "twa-spec-create",
+        "canonicalName": "Plugin Spec 创建校验",
+        "shortFact": "创建、展示并校验任务台 Plugin Spec。",
+        "nodeType": "method",
+        "parentId": "twa-design-flow",
+        "domainId": "twa-persona",
+        "order": 27
+      },
+      {
+        "id": "twa-double-confirm",
+        "canonicalName": "双重确认机制",
+        "shortFact": "输出目录确认与插件安装确认分别取得。",
+        "nodeType": "method",
+        "parentId": "twa-design-flow",
+        "domainId": "twa-persona",
+        "order": 28
+      },
+      {
+        "id": "twa-write-flow",
+        "canonicalName": "write 阶段流程",
+        "shortFact": "授权材料导入、证据绑定、受控协同生成。",
+        "nodeType": "method",
+        "parentId": "twa-persona-stage",
+        "domainId": "twa-persona",
+        "order": 29
+      },
+      {
+        "id": "twa-evidence-bind",
+        "canonicalName": "证据绑定机制",
+        "shortFact": "先检索绑定证据再规划大纲正文，禁止编造出处。",
+        "nodeType": "method",
+        "parentId": "twa-write-flow",
+        "domainId": "twa-persona",
+        "order": 30
+      },
+      {
+        "id": "twa-evidence-gap",
+        "canonicalName": "证据缺口标记",
+        "shortFact": "无来源支持时标记证据缺口而非填充。",
+        "nodeType": "method",
+        "parentId": "twa-evidence-bind",
+        "domainId": "twa-persona",
+        "order": 31
+      },
+      {
+        "id": "twa-snapshot-version",
+        "canonicalName": "快照版本机制",
+        "shortFact": "重要写入前创建快照并携带预期 revision。",
+        "nodeType": "method",
+        "parentId": "twa-write-flow",
+        "domainId": "twa-persona",
+        "order": 32
+      },
+      {
+        "id": "twa-checkpoint-resume",
+        "canonicalName": "检查点恢复",
+        "shortFact": "长步骤保存 checkpoint，中断后经确认恢复。",
+        "nodeType": "method",
+        "parentId": "twa-snapshot-version",
+        "domainId": "twa-persona",
+        "order": 33
+      },
+      {
+        "id": "twa-idempotency",
+        "canonicalName": "幂等键机制",
+        "shortFact": "稳定 idempotencyKey 防止重复写入。",
+        "nodeType": "method",
+        "parentId": "twa-checkpoint-resume",
+        "domainId": "twa-persona",
+        "order": 34
+      },
+      {
+        "id": "twa-review-flow",
+        "canonicalName": "review 阶段流程",
+        "shortFact": "只读审查结构、证据、引用与版本差异。",
+        "nodeType": "method",
+        "parentId": "twa-persona-stage",
+        "domainId": "twa-persona",
+        "order": 35
+      },
+      {
+        "id": "twa-diff-review",
+        "canonicalName": "版本差异审查",
+        "shortFact": "比较版本差异，输出可定位问题与建议。",
+        "nodeType": "method",
+        "parentId": "twa-review-flow",
+        "domainId": "twa-persona",
+        "order": 36
+      },
+      {
+        "id": "twa-stage-query",
+        "canonicalName": "阶段查询机制",
+        "shortFact": "wb_get_work_stage 获取当前工作阶段。",
+        "nodeType": "method",
+        "parentId": "twa-persona-recovery",
+        "domainId": "twa-persona",
+        "order": 37
+      },
+      {
+        "id": "twa-resume-state",
+        "canonicalName": "恢复状态机制",
+        "shortFact": "wb_get_resume_state 查询上次项目与阶段，确认后恢复。",
+        "nodeType": "method",
+        "parentId": "twa-persona-recovery",
+        "domainId": "twa-persona",
+        "order": 38
+      },
+      {
+        "id": "twa-resume-confirm",
+        "canonicalName": "恢复确认门",
+        "shortFact": "发现上次项目时展示项目与阶段，取得确认才恢复。",
+        "nodeType": "method",
+        "parentId": "twa-resume-state",
+        "domainId": "twa-persona",
+        "order": 39
+      },
+      {
+        "id": "twa-bind-project",
+        "canonicalName": "项目绑定机制",
+        "shortFact": "wb_bind_project 传稳定助手键绑定项目。",
+        "nodeType": "method",
+        "parentId": "twa-persona-recovery",
+        "domainId": "twa-persona",
+        "order": 40
+      },
+      {
+        "id": "twa-project-list",
+        "canonicalName": "项目列举机制",
+        "shortFact": "wb_list_projects 列出项目供选择与切换。",
+        "nodeType": "method",
+        "parentId": "twa-persona-recovery",
+        "domainId": "twa-persona",
+        "order": 41
+      },
+      {
+        "id": "twa-limit-govern",
+        "canonicalName": "项目上限治理",
+        "shortFact": "创建项目前检查活跃项目上限并治理溢出。",
+        "nodeType": "method",
+        "parentId": "twa-persona-lifecycle",
+        "domainId": "twa-persona",
+        "order": 42
+      },
+      {
+        "id": "twa-limit-param",
+        "canonicalName": "活跃项目上限",
+        "shortFact": "最多 10 个活跃项目。",
+        "nodeType": "parameter",
+        "parentId": "twa-limit-govern",
+        "domainId": "twa-persona",
+        "order": 43
+      },
+      {
+        "id": "twa-evict-oldest",
+        "canonicalName": "最早项目归档",
+        "shortFact": "第 11 个项目前展示最早项目，确认后传 confirmedEviction。",
+        "nodeType": "method",
+        "parentId": "twa-limit-govern",
+        "domainId": "twa-persona",
+        "order": 44
+      },
+      {
+        "id": "twa-recoverable-archive",
+        "canonicalName": "可恢复归档",
+        "shortFact": "删除默认执行可恢复归档，不静默物理销毁。",
+        "nodeType": "method",
+        "parentId": "twa-persona-lifecycle",
+        "domainId": "twa-persona",
+        "order": 45
+      },
+      {
+        "id": "twa-open-workbench",
+        "canonicalName": "工作台打开",
+        "shortFact": "wb_open_workbench 打开工作台，未指定项目时开首页。",
+        "nodeType": "method",
+        "parentId": "twa-persona-lifecycle",
+        "domainId": "twa-persona",
+        "order": 46
+      },
+      {
+        "id": "twa-skill-file",
+        "canonicalName": "text-workbench SKILL.md",
+        "shortFact": "协作技能文件，规定阶段工具调用与确认边界。",
+        "nodeType": "component",
+        "parentId": "twa-skill",
+        "domainId": "twa-skill",
+        "order": 50
+      },
+      {
+        "id": "twa-skill-gates",
+        "canonicalName": "总则与阶段门",
+        "shortFact": "总则五条及其子机制：前置检查、确认门、白名单、授权边界。",
+        "nodeType": "category",
+        "parentId": "twa-skill",
+        "domainId": "twa-skill",
+        "order": 51
+      },
+      {
+        "id": "twa-skill-persist",
+        "canonicalName": "持久化与归档",
+        "shortFact": "共享存储绑定、对话页面同源与归档策略。",
+        "nodeType": "category",
+        "parentId": "twa-skill",
+        "domainId": "twa-skill",
+        "order": 52
+      },
+      {
+        "id": "twa-skill-guideline",
+        "canonicalName": "总则五条",
+        "shortFact": "先查阶段、稳定键恢复、确认后切换、只调阶段工具、无来源标缺口。",
+        "nodeType": "method",
+        "parentId": "twa-skill-gates",
+        "domainId": "twa-skill",
+        "order": 53
+      },
+      {
+        "id": "twa-stage-first",
+        "canonicalName": "阶段前置检查",
+        "shortFact": "每次开始或恢复任务先调 wb_get_work_stage。",
+        "nodeType": "method",
+        "parentId": "twa-skill-guideline",
+        "domainId": "twa-skill",
+        "order": 54
+      },
+      {
+        "id": "twa-confirm-gate",
+        "canonicalName": "用户确认门",
+        "shortFact": "恢复、切换、删除等关键动作必须取得用户确认。",
+        "nodeType": "method",
+        "parentId": "twa-skill-guideline",
+        "domainId": "twa-skill",
+        "order": 55
+      },
+      {
+        "id": "twa-tool-scope",
+        "canonicalName": "阶段工具白名单",
+        "shortFact": "只调用当前阶段允许的工具，不绕过 Core 治理。",
+        "nodeType": "method",
+        "parentId": "twa-skill-guideline",
+        "domainId": "twa-skill",
+        "order": 56
+      },
+      {
+        "id": "twa-auth-boundary",
+        "canonicalName": "授权读取边界",
+        "shortFact": "未经用户授权不读取材料。",
+        "nodeType": "method",
+        "parentId": "twa-skill-guideline",
+        "domainId": "twa-skill",
+        "order": 57
+      },
+      {
+        "id": "twa-shared-store",
+        "canonicalName": "共享存储绑定",
+        "shortFact": "页面与对话使用同一 Core 存储与项目绑定。",
+        "nodeType": "method",
+        "parentId": "twa-skill-persist",
+        "domainId": "twa-skill",
+        "order": 58
+      },
+      {
+        "id": "twa-same-source",
+        "canonicalName": "对话页面同源",
+        "shortFact": "页面选择项目后对话工具作用于同一项目。",
+        "nodeType": "concept",
+        "parentId": "twa-skill-persist",
+        "domainId": "twa-skill",
+        "order": 59
+      },
+      {
+        "id": "twa-skill-archive",
+        "canonicalName": "归档策略",
+        "shortFact": "DSH 退出不删项目，删除默认可恢复归档。",
+        "nodeType": "method",
+        "parentId": "twa-skill-persist",
+        "domainId": "twa-skill",
+        "order": 60
+      },
+      {
+        "id": "twa-problem-bypass",
+        "canonicalName": "阶段绕过风险",
+        "shortFact": "绕过阶段治理直接调用工具会破坏权限边界。",
+        "nodeType": "problem",
+        "parentId": "twa-skill",
+        "domainId": "twa-skill",
+        "order": 61
+      },
+      {
+        "id": "twa-problem-unauth",
+        "canonicalName": "未授权读取风险",
+        "shortFact": "读取未授权材料会泄露项目数据。",
+        "nodeType": "problem",
+        "parentId": "twa-skill",
+        "domainId": "twa-skill",
+        "order": 62
+      },
+      {
+        "id": "twa-problem-duplicate",
+        "canonicalName": "重复写入风险",
+        "shortFact": "中断恢复时重复写入会破坏文档一致性。",
+        "nodeType": "problem",
+        "parentId": "twa-skill",
+        "domainId": "twa-skill",
+        "order": 63
+      },
+      {
+        "id": "twa-install-mech",
+        "canonicalName": "安装机制",
+        "shortFact": "安装器、前置校验、占位符替换与 DSH_HOME 解析。",
+        "nodeType": "category",
+        "parentId": "twa-install",
+        "domainId": "twa-install",
+        "order": 70
+      },
+      {
+        "id": "twa-install-artifacts",
+        "canonicalName": "交付制品",
+        "shortFact": "preset.yml、安装目标及其产物、领域插件目录。",
+        "nodeType": "category",
+        "parentId": "twa-install",
+        "domainId": "twa-install",
+        "order": 71
+      },
+      {
+        "id": "twa-install-packaging",
+        "canonicalName": "打包与发布",
+        "shortFact": "files 白名单、setup 命令与运行依赖声明。",
+        "nodeType": "category",
+        "parentId": "twa-install",
+        "domainId": "twa-install",
+        "order": 72
+      },
+      {
+        "id": "twa-install-script",
+        "canonicalName": "install-assets.mjs",
+        "shortFact": "安装器：复制预设资产并替换技能目录占位符。",
+        "nodeType": "component",
+        "parentId": "twa-install-mech",
+        "domainId": "twa-install",
+        "order": 73
+      },
+      {
+        "id": "twa-install-verify",
+        "canonicalName": "前置资产校验",
+        "shortFact": "安装前校验组合、预设与技能文件存在。",
+        "nodeType": "method",
+        "parentId": "twa-install-mech",
+        "domainId": "twa-install",
+        "order": 74
+      },
+      {
+        "id": "twa-install-replace",
+        "canonicalName": "占位符替换",
+        "shortFact": "把 __TEXT_WORKBENCH_SKILLS_DIR__ 替换为安装后路径。",
+        "nodeType": "method",
+        "parentId": "twa-install-mech",
+        "domainId": "twa-install",
+        "order": 75
+      },
+      {
+        "id": "twa-dshhome",
+        "canonicalName": "DSH_HOME 解析",
+        "shortFact": "默认 ~/.dsh，可用 DSH_HOME 环境变量覆盖。",
+        "nodeType": "parameter",
+        "parentId": "twa-install-mech",
+        "domainId": "twa-install",
+        "order": 76
+      },
+      {
+        "id": "twa-install-preset",
+        "canonicalName": "preset.yml",
+        "shortFact": "预设元数据：名称、描述与展示排序。",
+        "nodeType": "artifact",
+        "parentId": "twa-install-artifacts",
+        "domainId": "twa-install",
+        "order": 77
+      },
+      {
+        "id": "twa-install-target",
+        "canonicalName": "预设安装目标",
+        "shortFact": "DSH_HOME/.agent-presets/text-workbench-assistant-v0。",
+        "nodeType": "artifact",
+        "parentId": "twa-install-artifacts",
+        "domainId": "twa-install",
+        "order": 78
+      },
+      {
+        "id": "twa-installed-composition",
+        "canonicalName": "安装后组合文件",
+        "shortFact": "占位符已替换为绝对路径的组合文件副本。",
+        "nodeType": "artifact",
+        "parentId": "twa-install-target",
+        "domainId": "twa-install",
+        "order": 79
+      },
+      {
+        "id": "twa-installed-skills",
+        "canonicalName": "安装后技能副本",
+        "shortFact": "skills/ 目录的自包含副本。",
+        "nodeType": "artifact",
+        "parentId": "twa-install-target",
+        "domainId": "twa-install",
+        "order": 80
+      },
+      {
+        "id": "twa-install-plugindir",
+        "canonicalName": "领域插件目录",
+        "shortFact": "~/.dsh/workbench-plugins/ 存放生成的领域插件。",
+        "nodeType": "artifact",
+        "parentId": "twa-install-artifacts",
+        "domainId": "twa-install",
+        "order": 81
+      },
+      {
+        "id": "twa-files-whitelist",
+        "canonicalName": "files 白名单",
+        "shortFact": "package.json files 限定发布内容为预设资产与脚本。",
+        "nodeType": "parameter",
+        "parentId": "twa-install-packaging",
+        "domainId": "twa-install",
+        "order": 82
+      },
+      {
+        "id": "twa-setup-cmd",
+        "canonicalName": "setup 安装命令",
+        "shortFact": "npm run setup 执行安装器。",
+        "nodeType": "method",
+        "parentId": "twa-install-packaging",
+        "domainId": "twa-install",
+        "order": 83
+      },
+      {
+        "id": "twa-peer-deps",
+        "canonicalName": "运行依赖声明",
+        "shortFact": "peerDependencies 声明 dsh 与 dsh-workbench-core。",
+        "nodeType": "parameter",
+        "parentId": "twa-install-packaging",
+        "domainId": "twa-install",
+        "order": 84
+      },
+      {
+        "id": "twa-install-boundary",
+        "canonicalName": "项目边界",
+        "shortFact": "只含 Persona、Skill 与安装器，不含 Runtime 与领域代码。",
+        "nodeType": "concept",
+        "parentId": "twa-install",
+        "domainId": "twa-install",
+        "order": 85
+      },
+      {
+        "id": "twa-rt-policymode",
+        "canonicalName": "assistant-policy 模式",
+        "shortFact": "workbench-core 以单助手策略模式暴露治理能力。",
+        "nodeType": "concept",
+        "parentId": "twa-runtime",
+        "domainId": "twa-runtime",
+        "order": 90
+      },
+      {
+        "id": "twa-rt-tools",
+        "canonicalName": "wb_* 工具契约",
+        "shortFact": "Persona 与 Core 之间确定性工具接口面。",
+        "nodeType": "category",
+        "parentId": "twa-runtime",
+        "domainId": "twa-runtime",
+        "order": 91
+      },
+      {
+        "id": "twa-rt-core",
+        "canonicalName": "Core 核心运行时",
+        "shortFact": "存储、状态机、HTTP 服务、插件加载与 Plugin Spec。",
+        "nodeType": "category",
+        "parentId": "twa-runtime",
+        "domainId": "twa-runtime",
+        "order": 92
+      },
+      {
+        "id": "twa-rt-bundles",
+        "canonicalName": "领域插件生成",
+        "shortFact": "论文、专利任务台插件生成到独立目录。",
+        "nodeType": "category",
+        "parentId": "twa-runtime",
+        "domainId": "twa-runtime",
+        "order": 93
+      },
+      {
+        "id": "twa-tool-stage",
+        "canonicalName": "阶段查询切换工具",
+        "shortFact": "wb_get_work_stage 与 wb_set_work_stage。",
+        "nodeType": "method",
+        "parentId": "twa-rt-tools",
+        "domainId": "twa-runtime",
+        "order": 94
+      },
+      {
+        "id": "twa-tool-resume",
+        "canonicalName": "恢复绑定工具",
+        "shortFact": "wb_get_resume_state、wb_resume_project、wb_bind_project、wb_list_projects。",
+        "nodeType": "method",
+        "parentId": "twa-rt-tools",
+        "domainId": "twa-runtime",
+        "order": 95
+      },
+      {
+        "id": "twa-tool-limit",
+        "canonicalName": "项目上限工具",
+        "shortFact": "wb_get_project_limit 查询活跃项目数与上限。",
+        "nodeType": "method",
+        "parentId": "twa-rt-tools",
+        "domainId": "twa-runtime",
+        "order": 96
+      },
+      {
+        "id": "twa-tool-open",
+        "canonicalName": "工作台打开工具",
+        "shortFact": "wb_open_workbench 打开工作台页面。",
+        "nodeType": "method",
+        "parentId": "twa-rt-tools",
+        "domainId": "twa-runtime",
+        "order": 97
+      },
+      {
+        "id": "twa-tool-version",
+        "canonicalName": "快照检查点工具",
+        "shortFact": "wb_snapshot 与 wb_checkpoint 等版本工具。",
+        "nodeType": "method",
+        "parentId": "twa-rt-tools",
+        "domainId": "twa-runtime",
+        "order": 98
+      },
+      {
+        "id": "twa-core-runtime",
+        "canonicalName": "WorkbenchRuntime",
+        "shortFact": "聚合项目、大纲、正文、材料、证据、快照与导出操作。",
+        "nodeType": "component",
+        "parentId": "twa-rt-core",
+        "domainId": "twa-runtime",
+        "order": 99
+      },
+      {
+        "id": "twa-core-storage",
+        "canonicalName": "JSON 项目存储",
+        "shortFact": "单 JSON 文件持久化项目与会话绑定。",
+        "nodeType": "component",
+        "parentId": "twa-rt-core",
+        "domainId": "twa-runtime",
+        "order": 100
+      },
+      {
+        "id": "twa-core-statemachine",
+        "canonicalName": "阶段状态机",
+        "shortFact": "按插件 stateTable 驱动任务流转与 revision 冲突检测。",
+        "nodeType": "component",
+        "parentId": "twa-rt-core",
+        "domainId": "twa-runtime",
+        "order": 101
+      },
+      {
+        "id": "twa-core-server",
+        "canonicalName": "工作台 HTTP 服务",
+        "shortFact": "双栏可拖拽编辑 UI 与 REST API 承载层。",
+        "nodeType": "component",
+        "parentId": "twa-rt-core",
+        "domainId": "twa-runtime",
+        "order": 102
+      },
+      {
+        "id": "twa-core-loader",
+        "canonicalName": "插件加载器",
+        "shortFact": "Framework/Logic/Evidence/Material 四层注册与解析。",
+        "nodeType": "component",
+        "parentId": "twa-rt-core",
+        "domainId": "twa-runtime",
+        "order": 103
+      },
+      {
+        "id": "twa-core-pluginspec",
+        "canonicalName": "Plugin Spec",
+        "shortFact": "声明式领域规格，任务工作台的唯一事实来源。",
+        "nodeType": "concept",
+        "parentId": "twa-rt-core",
+        "domainId": "twa-runtime",
+        "order": 104
+      },
+      {
+        "id": "twa-bundle-generate",
+        "canonicalName": "任务台插件生成流程",
+        "shortFact": "由 Plugin Spec 生成隔离可安装插件包。",
+        "nodeType": "method",
+        "parentId": "twa-rt-bundles",
+        "domainId": "twa-runtime",
+        "order": 105
+      },
+      {
+        "id": "twa-bundle-thesis",
+        "canonicalName": "论文任务台插件",
+        "shortFact": "论文 Framework/Logic/Evidence/Material 四层插件。",
+        "nodeType": "method",
+        "parentId": "twa-rt-bundles",
+        "domainId": "twa-runtime",
+        "order": 106
+      },
+      {
+        "id": "twa-bundle-patent",
+        "canonicalName": "专利任务台插件",
+        "shortFact": "专利 Framework/Logic/Evidence/Material 四层插件。",
+        "nodeType": "method",
+        "parentId": "twa-rt-bundles",
+        "domainId": "twa-runtime",
+        "order": 107
+      },
+      {
+        "id": "twa-bundle-dir",
+        "canonicalName": "生成插件目录",
+        "shortFact": "~/.dsh/workbench-plugins/ 或用户确认目录。",
+        "nodeType": "artifact",
+        "parentId": "twa-rt-bundles",
+        "domainId": "twa-runtime",
+        "order": 108
+      },
+      {
+        "id": "twa-test-cases",
+        "canonicalName": "测试用例",
+        "shortFact": "install 与 package 两组 node:test 用例及其断言。",
+        "nodeType": "category",
+        "parentId": "twa-test",
+        "domainId": "twa-test",
+        "order": 110
+      },
+      {
+        "id": "twa-test-cmds",
+        "canonicalName": "验证命令",
+        "shortFact": "npm test 与 npm run check 及通过标准。",
+        "nodeType": "category",
+        "parentId": "twa-test",
+        "domainId": "twa-test",
+        "order": 111
+      },
+      {
+        "id": "twa-test-install",
+        "canonicalName": "install.test.js",
+        "shortFact": "在隔离 DSH_HOME 运行安装器并断言产物。",
+        "nodeType": "component",
+        "parentId": "twa-test-cases",
+        "domainId": "twa-test",
+        "order": 112
+      },
+      {
+        "id": "twa-test-isolated",
+        "canonicalName": "隔离 DSH_HOME 测试",
+        "shortFact": "临时 DSH_HOME 运行安装器避免污染真实环境。",
+        "nodeType": "method",
+        "parentId": "twa-test-install",
+        "domainId": "twa-test",
+        "order": 113
+      },
+      {
+        "id": "twa-test-selfcontain",
+        "canonicalName": "自包含断言",
+        "shortFact": "断言组合无占位符、含 persona、技能含恢复引用。",
+        "nodeType": "method",
+        "parentId": "twa-test-install",
+        "domainId": "twa-test",
+        "order": 114
+      },
+      {
+        "id": "twa-test-package",
+        "canonicalName": "package.test.js",
+        "shortFact": "断言预设包结构符合统一助手约束。",
+        "nodeType": "component",
+        "parentId": "twa-test-cases",
+        "domainId": "twa-test",
+        "order": 115
+      },
+      {
+        "id": "twa-test-unified",
+        "canonicalName": "统一助手断言",
+        "shortFact": "断言 assistant-policy 模式且无分离角色策略。",
+        "nodeType": "method",
+        "parentId": "twa-test-package",
+        "domainId": "twa-test",
+        "order": 116
+      },
+      {
+        "id": "twa-test-skillref",
+        "canonicalName": "技能引用断言",
+        "shortFact": "断言 SKILL.md 引用关键恢复与上限工具。",
+        "nodeType": "method",
+        "parentId": "twa-test-package",
+        "domainId": "twa-test",
+        "order": 117
+      },
+      {
+        "id": "twa-test-npm",
+        "canonicalName": "npm test 命令",
+        "shortFact": "node --test 执行全部测试用例。",
+        "nodeType": "method",
+        "parentId": "twa-test-cmds",
+        "domainId": "twa-test",
+        "order": 118
+      },
+      {
+        "id": "twa-test-check",
+        "canonicalName": "npm run check 命令",
+        "shortFact": "语法检查安装器并重跑测试。",
+        "nodeType": "method",
+        "parentId": "twa-test-cmds",
+        "domainId": "twa-test",
+        "order": 119
+      },
+      {
+        "id": "twa-test-pass",
+        "canonicalName": "测试通过标准",
+        "shortFact": "全部用例通过且语法检查退出 0。",
+        "nodeType": "metric",
+        "parentId": "twa-test-cmds",
+        "domainId": "twa-test",
+        "order": 120
+      }
+    ],
+    "cardBlocks": [
+      {
+        "nodeId": "text-workbench-assistant",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "面向论文、专利、合同、技术报告等结构化文本任务的统一 DSH Agent 预设。它负责自然语言交互和 design/write/review 阶段编排；确定性执行、权限、项目、证据、版本与审计由独立的 dsh-workbench-core 插件负责。自身不包含 Workbench Runtime，不保存项目数据，不生成领域插件代码，是典型的「对话层与执行层分离」架构。源码边界见 README 项目边界一节。"
+      },
+      {
+        "nodeId": "text-workbench-assistant",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "该架构成立的关键是把「说」与「做」分离：Persona 只描述行为与编排（agent.cordis.yml 的 text 配置），一切落地动作通过 wb_* 工具委托 workbench-core 的确定性实现。由此获得三方面收益：任何 LLM 无法绕过权限与状态机直接写存储；同一 Core 可服务多个 Agent 预设；预设本体可保持极薄、可审计、可测试。"
+      },
+      {
+        "nodeId": "twa-entry",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "以 agent.cordis.yml 声明唯一助手组合：Persona 实例注入人格，dsh-workbench-core 以 assistant-policy 模式挂载策略，技能文件系统插件按 providerName text-workbench-assistant-v0 装载自定义技能目录，技能工具插件把技能暴露为可调用工具。该域只做插件组合与身份标识，不含任何业务逻辑。"
+      },
+      {
+        "nodeId": "twa-persona",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "统一助手人格域：通过 design、write、review 三个明确阶段组织协作，负责恢复上次项目、绑定项目、管理 10 个活跃项目上限与打开工作台。所有确定性操作一律通过 wb_* 工具委托 Core，不直接触碰文件或存储。"
+      },
+      {
+        "nodeId": "twa-skill",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "协作技能治理域：skills/text-workbench/SKILL.md 是 Agent 在三阶段的行为规则权威，规定先查阶段、稳定键恢复、确认后切换、只调阶段工具、无来源标记证据缺口，以及页面持久化与可恢复归档；同时暴露阶段绕过、未授权读取、重复写入三类治理问题。"
+      },
+      {
+        "nodeId": "twa-install",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "安装与交付域：preset.yml 提供助手元数据，scripts/install-assets.mjs 将 agent.cordis.yml、preset.yml 与 skills/ 复制到 DSH 预设目录并替换技能目录占位符；打包通过 files 白名单限定发布内容，运行依赖通过 peerDependencies 声明。安装器只复制预设资产，不复制或内嵌 Core 源码。"
+      },
+      {
+        "nodeId": "twa-runtime",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "运行依赖域：dsh-workbench-core 是必须单独安装激活的运行依赖，在 assistant-policy 模式下提供 wb_* 工具面、核心运行时（存储/状态机/HTTP 服务/插件加载）与领域插件生成能力。本项目只声明依赖并描述接缝，不实现 Core。"
+      },
+      {
+        "nodeId": "twa-test",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "验证测试域：两个 node:test 用例守护交付物——install.test.js 验证安装器在隔离 DSH_HOME 产出自包含预设，package.test.js 验证预设包结构符合统一助手约束；npm test 与 npm run check 为执行入口，退出 0 为通过标准。"
+      },
+      {
+        "nodeId": "twa-entry-compose",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "组合文件与标识类别：归组 agent.cordis.yml 组合文件、稳定助手键 web:text-workbench-assistant-v0 与 providerName 标识。它们共同定义「本助手是谁、技能挂在哪」，是 DSH 发现与恢复助手的身份面。"
+      },
+      {
+        "nodeId": "twa-entry-plugins",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "插件实例类别：按 DSH/Cordis 插件契约归组 persona、policy、skill-filesystem、tool-skill 四个实例。每个实例只负责一类能力注入，实例之间通过组合文件按顺序装配。"
+      },
+      {
+        "nodeId": "twa-entry-composition",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "DSH 组合文件（源码根目录 agent.cordis.yml），声明四个插件实例：dsh-persona（人格 text）、dsh-workbench-core mode assistant-policy（策略）、dsh-skill-filesystem（providerName text-workbench-assistant-v0、includeDefaultRoots false、customSkillDirs 含 __TEXT_WORKBENCH_SKILLS_DIR__ 占位符）与 dsh-tool-skill。安装器负责把占位符替换为安装后技能目录绝对路径。"
+      },
+      {
+        "nodeId": "twa-entry-composition",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "组合文件采用占位符而非硬编码路径，使仓库内资产可携带、安装后可定位：源码中技能目录与组合文件同根，安装器在复制完成后一次性 replaceAll 写入真实绝对路径，保证安装目标完全自包含且不依赖仓库位置。"
+      },
+      {
+        "nodeId": "twa-entry-stablekey",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "稳定助手键 web:text-workbench-assistant-v0：跨会话、跨工具调用标识本助手，用于 wb_get_resume_state 查询恢复状态与 wb_bind_project 绑定项目。它把「助手身份」从「会话实例」中解耦，使新会话可以定位上次项目与阶段。"
+      },
+      {
+        "nodeId": "twa-entry-stablekey",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "稳定键成立的依据：DSH 退出不会删除项目，但会话上下文会消失；只有把恢复查询绑定到与实现路径无关的稳定标识（而非进程或对话 ID），新会话才能可靠恢复。providerName 与恢复键共用同一 v0 后缀，避免版本升级后旧状态不可达。"
+      },
+      {
+        "nodeId": "twa-entry-provider",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "providerName 标识 text-workbench-assistant-v0：技能文件系统插件用它命名技能提供方，并配合 includeDefaultRoots: false 只从 customSkillDirs 装载本项目技能，确保助手不加载无关默认技能。"
+      },
+      {
+        "nodeId": "twa-entry-provider",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "关闭默认技能根、只读自定义目录，形成技能白名单：即使宿主 DSH 预置了大量通用技能，本助手也只能看到 text-workbench 一个技能，降低工具面噪声与误调用风险。"
+      },
+      {
+        "nodeId": "twa-entry-persona",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "@deepseek-ai/dsh-persona 插件实例，config.text 写入完整助手人格：统一入口、三阶段工作方式、先查阶段再恢复、确认后才切换、只依据绑定项目、用户授权材料与可追溯证据生成，不得捏造来源或绕过当前阶段工具权限。人格只描述行为，不实现任何工具。"
+      },
+      {
+        "nodeId": "twa-entry-persona",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：用户自然语言任务（论文/专利/合同/技术报告）、阶段切换原因、恢复确认；输出：阶段行为约束（供 LLM 遵循）、绑定/恢复/切换的调用指令。输出不包含任何存储读写，全部落到 wb_* 工具层。"
+      },
+      {
+        "nodeId": "twa-entry-policy",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "dsh-workbench-core 插件以 mode: assistant-policy 挂载为策略插件，将 Core 的治理能力（权限、项目、证据、版本、审计）以单助手策略暴露给 Persona。该实例是本项目与 Core 运行时的唯一接缝；安装顺序上先装 Core 插件、后装本预设。"
+      },
+      {
+        "nodeId": "twa-entry-policy",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "策略模式决定工具可见性：assistant-policy 下所有 wb_* 工具统一暴露给单助手（而非按 Designer/Writer/Reviewer 分离白名单），配合 SKILL.md 的阶段工具白名单在提示层约束调用，形成「运行层宽松、规则层收紧」的两段式治理。"
+      },
+      {
+        "nodeId": "twa-entry-skillfiles",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "@deepseek-ai/dsh-skill-filesystem 插件实例：providerName 设为 text-workbench-assistant-v0，includeDefaultRoots 关闭，customSkillDirs 指向安装后技能目录（占位符替换后为绝对路径）。"
+      },
+      {
+        "nodeId": "twa-entry-skillfiles",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：providerName、includeDefaultRoots、customSkillDirs 配置；输出：可被加载的 SKILL.md 技能集（仅 text-workbench）。安装器把占位符改写为绝对路径是它可用的前置条件。"
+      },
+      {
+        "nodeId": "twa-entry-skilltool",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "@deepseek-ai/dsh-tool-skill 插件实例：把已装载的技能声明为 LLM 可调用的工具入口，使 SKILL.md 的规则能进入模型工具循环。它是技能「文件」与「可执行」之间的桥。"
+      },
+      {
+        "nodeId": "twa-entry-skilltool",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "技能先由文件系统插件定位、再由工具插件暴露，两步解耦使技能内容可独立更新而无需重装插件；工具插件只负责包装，不解释规则语义。"
+      },
+      {
+        "nodeId": "twa-persona-stages",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段编排类别：归组三阶段主流程及其子机制（阶段切换确认、design/write/review 流程、证据绑定、快照版本、检查点恢复、幂等键、版本差异审查）。划分维度为「生成生命周期的推进阶段」。"
+      },
+      {
+        "nodeId": "twa-persona-recovery",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "恢复与绑定类别：归组阶段查询、恢复状态、恢复确认门、项目绑定与项目列举机制。划分维度为「跨会话把上下文接回同一项目」。"
+      },
+      {
+        "nodeId": "twa-persona-lifecycle",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "项目生命周期类别：归组项目上限治理、活跃项目上限参数、最早项目归档、可恢复归档与工作台打开机制。划分维度为「项目从创建到归档的治理规则」。"
+      },
+      {
+        "nodeId": "twa-app-scenarios",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "应用场景节点：论文、专利、合同、技术报告四类结构化文本任务。它们是 design 阶段构建领域任务台的输入类型，也是 preset.yml 描述中声明的能力范围。"
+      },
+      {
+        "nodeId": "twa-app-scenarios",
+        "type": "application",
+        "title": "应用场景",
+        "text": "使用者为写作者/研究者：论文场景产出含章节大纲与引用规范的正文，专利场景产出含权利要求与新颖性检索的任务台，合同与技术报告场景复用同一套设计→写作→审查流程。不适用场景：非结构化闲聊、无项目绑定的自由写作（超出工作台治理边界）。"
+      },
+      {
+        "nodeId": "twa-app-scenarios",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：用户的任务类型声明与自然语言需求；输出：匹配类型的 Plugin Spec 草案，进入 design 流程展示与校验。四类任务共享同一设计入口，差异体现在 Core 生成的领域插件。"
+      },
+      {
+        "nodeId": "twa-app-scenarios",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 用户说明任务类型；2. design 创建对应 Plugin Spec 并展示；3. 取得输出目录与安装确认；4. 指定任务台与项目后绑定进入 write；5. 按证据受控生成；6. review 审查后导出。"
+      },
+      {
+        "nodeId": "twa-app-scenarios",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "统一入口换取场景复用：单一 Persona 覆盖四类任务，减少预设数量与维护成本，代价是任务差异全部下沉到 Core 插件层，插件质量直接决定场景适配度。"
+      },
+      {
+        "nodeId": "twa-app-scenarios",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "验证问题：四类任务是否都能走通设计→写作→审查？通过标准：package.test.js 断言统一助手结构、install.test.js 断言预设可安装；任务台插件由 workbench-core 侧测试覆盖。"
+      },
+      {
+        "nodeId": "twa-persona-stage",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "三阶段编排：design 构建领域任务台，write 人机协同生成，review 只读审查与导出。阶段切换必须调用 wb_set_work_stage 并传 userConfirmed: true、稳定助手键与切换原因；任何工具不得绕过当前阶段权限。"
+      },
+      {
+        "nodeId": "twa-persona-stage",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "阶段是权限的载体而非装饰：Core 状态机按阶段约束可写操作，LLM 只能通过 wb_set_work_stage 显式迁移。确认参数 userConfirmed 把「用户知情」变成状态迁移的硬前置，杜绝模型自行跳阶段。"
+      },
+      {
+        "nodeId": "twa-persona-stage",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. wb_get_work_stage 查当前阶段；2. 用户提出任务/恢复请求；3. design：建 Spec、双重确认、安装；4. 指定任务台与项目，wb_bind_project + 确认；5. wb_set_work_stage 进入 write；6. write 内按需确认返回 review；7. review 定稿后导出。"
+      },
+      {
+        "nodeId": "twa-persona-stage",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "三阶段线性模型牺牲了自由跳转的灵活性，换取可审计的生成轨迹：每个阶段都有明确的准入工具集，误操作面缩小，代价是用户想临时改需求必须经阶段切换确认。"
+      },
+      {
+        "nodeId": "twa-stage-switch-confirm",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段切换确认机制：wb_set_work_stage 必须携带 userConfirmed: true、稳定助手键与切换原因；未确认的切换请求被状态机拒绝。它是三阶段编排的守门员。"
+      },
+      {
+        "nodeId": "twa-stage-switch-confirm",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：目标阶段、userConfirmed 布尔、稳定助手键、切换原因文本；输出：阶段迁移结果或拒绝原因。写阶段时还要求携带预期 revision 以检测并发冲突。"
+      },
+      {
+        "nodeId": "twa-design-flow",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "design 阶段流程：分析任务并创建、展示、校验 Plugin Spec；分别取得输出目录确认与插件安装确认；安装后等待用户指定任务台与项目；绑定后经确认进入 write。"
+      },
+      {
+        "nodeId": "twa-design-flow",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 分析用户任务类型；2. 创建 Plugin Spec 并展示校验结果；3. 取得输出目录确认；4. 取得插件安装确认并安装；5. 等待用户指定任务台与项目；6. 创建或选择项目（含上限检查）；7. wb_bind_project 绑定；8. 确认后进入 write。"
+      },
+      {
+        "nodeId": "twa-spec-create",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "Plugin Spec 创建校验：把自然语言需求转化为声明式任务台规格（documentSchema、stateTable、materialSchema 等），展示给用户审阅并校验合法。Spec 是后续生成任务台的唯一事实来源。"
+      },
+      {
+        "nodeId": "twa-spec-create",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "先 Spec 后实现的原因：Spec 是人与模型对「要建什么」的共同契约，校验通过后才进入安装，避免把未确认的设计直接落地为可执行插件；Spec 同时驱动 Core 的插件生成器产出领域插件。"
+      },
+      {
+        "nodeId": "twa-double-confirm",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "双重确认机制：输出目录确认与插件安装确认必须分别取得，缺一不可。两个确认对应两个不可逆动作（写盘位置、安装范围），分开确认可防止一次误点同时放行两者。"
+      },
+      {
+        "nodeId": "twa-double-confirm",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "将「写到哪」与「装什么」拆成独立确认点：用户可能认可目录但不认可安装内容，或反之；合并确认会丢失其中一方的明确授权，违背最小授权原则。"
+      },
+      {
+        "nodeId": "twa-write-flow",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "write 阶段流程：读取绑定项目完整工作台状态，只导入用户明确选择的材料；先检索和绑定证据，再规划大纲和正文，不得编造出处；重要写入前创建快照并携带预期 revision；长步骤保存 checkpoint 与稳定 idempotencyKey；中断时说明恢复点经确认后恢复，禁止重复写入。"
+      },
+      {
+        "nodeId": "twa-write-flow",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 读取绑定项目状态；2. 用户选择导入材料；3. 检索并绑定证据，无来源标记缺口；4. 规划大纲与正文；5. 重要写入前快照 + 预期 revision；6. 长步骤写 checkpoint + idempotencyKey；7. 检测到中断则展示恢复点，经确认从 checkpoint 恢复。"
+      },
+      {
+        "nodeId": "twa-write-flow",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "受控生成牺牲生成速度换取可恢复性：每次重要写入都带版本与快照开销，但换来中断后不丢稿、不重复写入；对论文/专利这类长文本，可靠性优先于吞吐。"
+      },
+      {
+        "nodeId": "twa-evidence-bind",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "证据绑定机制：生成前先检索并绑定可追溯证据（材料引用、来源定位），大纲与正文以绑定证据为支撑；检索和绑定证据发生在规划正文之前。"
+      },
+      {
+        "nodeId": "twa-evidence-bind",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "证据先行的因果链：先有证据才有可验证的生成。绑定操作让每个断言可回溯到来源，LLM 无来源可引时必须走证据缺口标记而非自由发挥，从机制上抑制幻觉。"
+      },
+      {
+        "nodeId": "twa-evidence-bind",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 列出待生成章节的关键主张；2. 在授权材料中检索对应证据；3. 绑定证据并记录来源定位；4. 无匹配时标记证据缺口；5. 带证据规划大纲，再逐节生成正文。"
+      },
+      {
+        "nodeId": "twa-evidence-gap",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "证据缺口标记：当某主张没有来源支持时，在输出中显式标记缺口而非填充内容。它是证据绑定机制的下游兜底。"
+      },
+      {
+        "nodeId": "twa-evidence-gap",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "缺口的价值在于可审计：把「不知道」显式化，用户能一眼看到哪些内容未经证实；若静默填充，审查环节将无法区分可信与编造内容。"
+      },
+      {
+        "nodeId": "twa-snapshot-version",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "快照版本机制：重要写入前创建快照并携带预期 revision；revision 用于冲突检测与版本回溯，快照用于内容恢复。它是 write 阶段数据一致性的基础。"
+      },
+      {
+        "nodeId": "twa-snapshot-version",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "预期 revision 机制类似乐观锁：写入时校验当前 revision 与预期一致，不一致说明存在并发修改，拒绝写入；快照提供内容级回滚，二者配合覆盖「写前保护」与「写后可回」。"
+      },
+      {
+        "nodeId": "twa-snapshot-version",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：待写入内容、预期 revision、快照理由；输出：新快照记录、更新后的 revision、写入结果。快照由 Core 存储统一落盘。"
+      },
+      {
+        "nodeId": "twa-checkpoint-resume",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "检查点恢复：长步骤生成过程中周期保存 checkpoint，中断后向用户说明恢复点，经确认后从最近 checkpoint 续写，避免整段重来或重复写入。"
+      },
+      {
+        "nodeId": "twa-checkpoint-resume",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 每完成一个长步骤子任务写 checkpoint；2. 检测到中断运行时说明当前恢复点；3. 用户确认；4. 从 checkpoint 恢复上下文；5. 继续后续子任务并携带幂等键去重。"
+      },
+      {
+        "nodeId": "twa-checkpoint-resume",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "验证问题：中断恢复是否不重不漏？通过标准：恢复后文档无重复段落、无丢失内容；package.test.js 与安装测试保证恢复工具链（wb_resume_project 等）存在。"
+      },
+      {
+        "nodeId": "twa-idempotency",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "幂等键机制：长步骤写入携带稳定 idempotencyKey，同一键的重复提交被识别并忽略，防止「确认后恢复」与「原执行」双重写入。"
+      },
+      {
+        "nodeId": "twa-idempotency",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "幂等键与状态机配合：写入前登记键与状态，重复键返回既有结果而非重放副作用；它把「网络/会话不确定」转化为「存储层可判定」，是恢复安全性的最后一环。"
+      },
+      {
+        "nodeId": "twa-idempotency",
+        "type": "code",
+        "title": "关键实现",
+        "text": "幂等写入的判定逻辑示意（语言为伪代码，表达核心语义）。",
+        "code": "async function writeSection(state, key, content) {\n  const existing = await state.idempotency.get(key)\n  if (existing) return { ok: true, duplicate: true, revision: existing.revision }\n  const revision = await state.machine.expectRevision(state.project, state.expectedRevision)\n  await state.storage.commit({ key, content, revision })\n  return { ok: true, duplicate: false, revision }\n}",
+        "language": "typescript"
+      },
+      {
+        "nodeId": "twa-review-flow",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "review 阶段流程：用户要求审查后进入 review，检查结构、领域字段、证据、引用、术语和版本差异，只输出可定位的问题与建议，不直接修改正文；用户要求修改时确认后返回 write；用户确认定稿后再导出。"
+      },
+      {
+        "nodeId": "twa-review-flow",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 用户要求审查；2. wb_set_work_stage 进入 review；3. 检查结构与证据链；4. 输出可定位问题清单；5. 如需修改，确认后返回 write；6. 定稿确认后导出。"
+      },
+      {
+        "nodeId": "twa-review-flow",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "审查与写作隔离：review 只读，保证审查意见不被生成过程污染；代价是修改必须走阶段切换，多一次确认开销，但审查结论因此可信。"
+      },
+      {
+        "nodeId": "twa-diff-review",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "版本差异审查：比较版本间差异（结构、领域字段、证据、引用、术语），输出定位到具体位置的问题与建议。它是 review 阶段的核心分析动作。"
+      },
+      {
+        "nodeId": "twa-diff-review",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：当前版本与目标版本（或快照链）；输出：差异清单（added/removed/changed 定位）、问题列表与修改建议。输出不写入正文。"
+      },
+      {
+        "nodeId": "twa-stage-query",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段查询机制：每次开始或恢复任务先调用 wb_get_work_stage 获取当前工作阶段，作为后续所有行为的前提。它是总则第一条的执行落点。"
+      },
+      {
+        "nodeId": "twa-stage-query",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：稳定助手键（上下文标识）；输出：当前阶段标识（design/write/review）。无项目时不返回阶段，走工作台首页流程。"
+      },
+      {
+        "nodeId": "twa-resume-state",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "恢复状态机制：用稳定助手键调用 wb_get_resume_state 查询上次项目与阶段；发现上次项目时展示项目与阶段，取得确认后才 wb_resume_project 恢复。DSH 退出不会删除项目，恢复依赖该机制重新绑定。"
+      },
+      {
+        "nodeId": "twa-resume-state",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. wb_get_work_stage 查阶段；2. wb_get_resume_state 查上次项目与阶段；3. 展示项目与阶段；4. 用户确认；5. wb_resume_project 恢复绑定；6. 继续原阶段工作。"
+      },
+      {
+        "nodeId": "twa-resume-confirm",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "恢复确认门：恢复前必须向用户展示上次项目与阶段并取得确认，禁止静默恢复。它防止新会话把用户带到非预期上下文。"
+      },
+      {
+        "nodeId": "twa-resume-confirm",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "恢复是状态改写动作，静默恢复可能让用户误以为在新项目工作；确认门把「接回哪段工作」的决定权交还用户，与阶段切换确认门同构。"
+      },
+      {
+        "nodeId": "twa-bind-project",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "项目绑定机制：创建或选择项目时调用 wb_bind_project 并传稳定助手键，把对话绑定到项目；绑定后 wb_set_work_stage 进入 write。页面选择项目后，对话工具作用于同一项目。"
+      },
+      {
+        "nodeId": "twa-bind-project",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：项目标识、稳定助手键、用户确认；输出：绑定结果。绑定是 write 阶段工具可用的前置条件——未绑定项目的写工具调用被拒。"
+      },
+      {
+        "nodeId": "twa-project-list",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "项目列举机制：wb_list_projects 列出已有项目供用户选择或切换，支持「把当前对话绑定到某项目/切换到某项目」的自然语言指令。"
+      },
+      {
+        "nodeId": "twa-limit-govern",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "项目上限治理：创建项目前调用 wb_get_project_limit 检查活跃项目数；达到上限时展示将被归档的最早项目，取得单独确认（confirmedEviction: true）后才创建。"
+      },
+      {
+        "nodeId": "twa-limit-govern",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 用户请求创建项目；2. wb_get_project_limit 查活跃数；3. 若已达 10：展示 createdAt 最早的项目；4. 用户确认归档（confirmedEviction: true）；5. 归档最早项目；6. 创建新项目并绑定。"
+      },
+      {
+        "nodeId": "twa-limit-govern",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "上限 10 是存储与心智的平衡：项目过多会拖慢工作台列表与状态加载，过少则频繁归档打扰用户；配合可恢复归档，驱逐代价可控。"
+      },
+      {
+        "nodeId": "twa-limit-param",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "活跃项目上限参数：值 10。活跃指未归档项目；归档项目不计数。该参数在 README 与 SKILL.md 中一致声明。"
+      },
+      {
+        "nodeId": "twa-limit-param",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "把上限固化为公开常数而非模型临时判断，保证「第 11 个项目」的判定在所有会话一致，测试可以确定性验证该行为。"
+      },
+      {
+        "nodeId": "twa-evict-oldest",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "最早项目归档：创建第 11 个项目前，展示 createdAt 最早的项目，用户确认后传 confirmedEviction: true 执行归档；归档不删除数据，可恢复。"
+      },
+      {
+        "nodeId": "twa-evict-oldest",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "按 createdAt 选择驱逐对象是确定性策略：不依赖模型偏好，用户可预期「最早的项目会先被归档」；confirmedEviction 参数把驱逐变成显式授权动作。"
+      },
+      {
+        "nodeId": "twa-recoverable-archive",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "可恢复归档：用户说「删除」时默认执行可恢复归档而非物理销毁；只有确认后才执行。归档项目不进入活跃列表，但状态保留可回查。"
+      },
+      {
+        "nodeId": "twa-recoverable-archive",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "误删不可逆，归档可逆：把删除语义降级为可恢复操作，牺牲少量存储换取误操作的可撤回性；对长文本项目，撤回能力比空间更稀缺。"
+      },
+      {
+        "nodeId": "twa-open-workbench",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "工作台打开：未指定项目时调用 wb_open_workbench({}) 打开工作台首页；指定项目时先绑定再打开。工作台页面与对话共享同一 Core 存储与项目绑定。"
+      },
+      {
+        "nodeId": "twa-open-workbench",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：可选项目标识；输出：工作台页面导航。绑定状态跨页面与对话同步，页面选择项目后对话侧工具作用于同一项目。"
+      },
+      {
+        "nodeId": "twa-skill-file",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "协作技能文件（skills/text-workbench/SKILL.md）：总则 5 条 + Design/Write/Review 各节规则 + 页面持久化与归档 6 条。它是 Agent 行为规则的权威来源，被技能文件系统插件装载，经技能工具插件暴露给模型。"
+      },
+      {
+        "nodeId": "twa-skill-file",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：模型在工具循环中读取的规则文本；输出：行为约束（阶段工具调用、确认点、证据规则）。安装器复制该文件到安装目标并断言其引用关键工具。"
+      },
+      {
+        "nodeId": "twa-skill-file",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "package.test.js 断言 SKILL.md 含 wb_get_resume_state 与 wb_get_project_limit 引用；install.test.js 断言安装后副本含 wb_resume_project 引用，防止规则文件被破坏或漏装。"
+      },
+      {
+        "nodeId": "twa-skill-gates",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "总则与阶段门类别：归组总则五条及其子机制（阶段前置检查、用户确认门、阶段工具白名单、授权读取边界）。划分维度为「跨阶段生效的行为闸门」。"
+      },
+      {
+        "nodeId": "twa-skill-persist",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "持久化与归档类别：归组共享存储绑定、对话页面同源概念与归档策略。划分维度为「项目数据如何在页面与对话间持续」。"
+      },
+      {
+        "nodeId": "twa-skill-guideline",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "总则五条：每次开始或恢复先调 wb_get_work_stage；用稳定助手键经 wb_get_resume_state 恢复且确认后才 wb_resume_project；阶段切换必须 wb_set_work_stage 传 userConfirmed；只调用当前阶段允许的工具；未经授权不读材料、无来源标记证据缺口。"
+      },
+      {
+        "nodeId": "twa-skill-guideline",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "五条规则构成最小治理闭环：查阶段（定位）→ 恢复确认（接回）→ 确认切换（授权）→ 工具白名单（执行边界）→ 证据缺口（诚实性）。每一条都对应一个可被状态机或测试检查的约束。"
+      },
+      {
+        "nodeId": "twa-stage-first",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段前置检查：每次开始或恢复任务，第一个动作是调用 wb_get_work_stage。它保证后续所有行为都基于当前真实阶段，而不是模型假设。"
+      },
+      {
+        "nodeId": "twa-stage-first",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "先查后做的原因：LLM 上下文可能滞后于真实状态（如页面已切项目），阶段查询是唯一权威来源；把查询列为强制第一步可消除「以为在 A 阶段却执行 B 阶段动作」的错位。"
+      },
+      {
+        "nodeId": "twa-confirm-gate",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "用户确认门：恢复、阶段切换、删除、驱逐等关键动作必须取得用户明确确认；确认随调用参数传递（userConfirmed、confirmedEviction），而非仅靠口头询问。"
+      },
+      {
+        "nodeId": "twa-confirm-gate",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "确认参数化使确认成为状态机可校验的输入：模型「问过了」不成立，只有调用携带确认标志才算数。这把信任从提示词层面提升到执行层面。"
+      },
+      {
+        "nodeId": "twa-tool-scope",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段工具白名单：只调用当前阶段允许的工具，不得通过其他入口绕过 Core 治理；如 write 阶段不可调用审查导出工具，review 阶段不可直接改正文。"
+      },
+      {
+        "nodeId": "twa-tool-scope",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "白名单与状态机双保险：规则层禁止（提示约束）+ 执行层校验（Core 工具拒绝），即使模型误调用，状态机也会拒绝越权工具。"
+      },
+      {
+        "nodeId": "twa-auth-boundary",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "授权读取边界：未经用户授权不读取材料；只导入用户明确选择的材料，只依据绑定项目与授权内容生成。"
+      },
+      {
+        "nodeId": "twa-auth-boundary",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "授权边界的依据：项目数据属于用户，读取即接触；把读取限定在用户显式选择的材料上，缩小数据暴露面，也保证生成内容有可声明的授权来源。"
+      },
+      {
+        "nodeId": "twa-shared-store",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "共享存储绑定：DSH 对话与工作台页面使用同一 Core 存储与项目绑定；页面选择项目后，后续对话工具作用于同一项目，双向同步。"
+      },
+      {
+        "nodeId": "twa-shared-store",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "单一存储源消除页面/对话分歧：若两侧各自持有项目状态，切换会产生不一致；共享绑定使「页面选了项目」等价于「对话绑定了项目」，用户感知为同一工作区。"
+      },
+      {
+        "nodeId": "twa-same-source",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "对话页面同源概念：对话与工作台页面不是两套系统，而是同一 Core 存储的两个视图；绑定状态、项目数据、阶段均同源。"
+      },
+      {
+        "nodeId": "twa-same-source",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "同源是共享存储的语义前提：它决定了「在哪里操作」不影响「操作哪个项目」，从而允许用户随时在对话与页面间切换而不丢失上下文。"
+      },
+      {
+        "nodeId": "twa-skill-archive",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "归档策略：DSH 退出不删除项目；用户要求删除时默认执行可恢复归档，确认后才执行；归档项目可回查，不进入活跃计数。"
+      },
+      {
+        "nodeId": "twa-skill-archive",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 用户提出删除；2. 说明默认操作为可恢复归档；3. 用户确认；4. 执行归档并保留数据；5. 若用户要求彻底删除，另行确认后物理清理。"
+      },
+      {
+        "nodeId": "twa-problem-bypass",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段绕过风险：模型或用户绕过阶段治理直接调用工具（如未进 write 就写入正文、未确认就删除），会破坏权限边界与审计轨迹。它是治理机制要解决的核心问题，不是方法。"
+      },
+      {
+        "nodeId": "twa-problem-bypass",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "成因与影响链：LLM 工具调用具有自由度，若执行层不校验阶段，任何提示层面的约束都可能被绕过；后果是项目数据被越权修改、审查失效。缓解靠阶段工具白名单与用户确认门（见 MITIGATES 关系）。"
+      },
+      {
+        "nodeId": "twa-problem-unauth",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "未授权读取风险：读取用户未授权的材料会泄露项目数据、污染生成内容。问题本身，不含解决方案。"
+      },
+      {
+        "nodeId": "twa-problem-unauth",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "成因：模型可能把「可读文件」等同于「已授权材料」；影响链：越权读取 → 数据暴露 → 生成内容混入未授权信息 → 审查与审计失效。缓解靠授权读取边界机制。"
+      },
+      {
+        "nodeId": "twa-problem-duplicate",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "重复写入风险：中断恢复时若重放已执行写入，会产生重复段落、覆盖新内容或破坏 revision 链。问题本身。"
+      },
+      {
+        "nodeId": "twa-problem-duplicate",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "成因：会话中断后模型无法凭记忆判断哪些写入已落盘；影响链：重复写入 → 文档不一致 → 版本混乱。缓解靠检查点恢复与幂等键机制。"
+      },
+      {
+        "nodeId": "twa-install-mech",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "安装机制类别：归组安装器脚本、前置资产校验、占位符替换与 DSH_HOME 解析。划分维度为「从仓库资产到安装目标的过程动作」。"
+      },
+      {
+        "nodeId": "twa-install-artifacts",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "交付制品类别：归组 preset.yml、预设安装目标及其内部产物（安装后组合文件、技能副本）与领域插件目录。划分维度为「安装链路产出的物」。"
+      },
+      {
+        "nodeId": "twa-install-packaging",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "打包与发布类别：归组 files 白名单、setup 安装命令与运行依赖声明。划分维度为「npm 包的发布约束与安装入口」。"
+      },
+      {
+        "nodeId": "twa-install-script",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "安装器脚本（scripts/install-assets.mjs）：以 DSH_HOME 或 ~/.dsh 为根，创建 .agent-presets/text-workbench-assistant-v0 目录，复制 agent.cordis.yml、preset.yml、skills/ 三组资产，并把组合文件中的 __TEXT_WORKBENCH_SKILLS_DIR__ 替换为安装后技能目录绝对路径。不复制 Core 源码，只复制预设资产。"
+      },
+      {
+        "nodeId": "twa-install-script",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "安装器是纯复制 + 单点替换：不编译、不执行依赖逻辑，因此可被隔离 DSH_HOME 测试确定性验证。占位符替换使仓库内组合文件保持可读（含占位符），安装后组合文件可运行（绝对路径）。"
+      },
+      {
+        "nodeId": "twa-install-script",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 解析包根目录与 DSH_HOME（环境变量优先，默认 ~/.dsh）；2. 前置校验 agent.cordis.yml、preset.yml、skills/text-workbench/SKILL.md 存在；3. 递归创建 .agent-presets/text-workbench-assistant-v0；4. 复制三个资产；5. 读组合文件，replaceAll 占位符为安装后技能目录（正斜杠化）；6. 写回并输出安装位置与 Core 依赖提示。"
+      },
+      {
+        "nodeId": "twa-install-script",
+        "type": "code",
+        "title": "关键实现",
+        "text": "安装器核心：复制资产与占位符替换。",
+        "code": "const compositionPath = path.join(target, 'agent.cordis.yml')\nconst skillsPath = path.join(target, 'skills').replaceAll('\\\\', '/')\nconst composition = (await readFile(compositionPath, 'utf8'))\n  .replaceAll('__TEXT_WORKBENCH_SKILLS_DIR__', skillsPath)\nawait writeFile(compositionPath, composition, 'utf8')",
+        "language": "typescript"
+      },
+      {
+        "nodeId": "twa-install-script",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "用复制而非符号链接换取自包含：安装目标可独立于仓库存在、可被测试清理，代价是仓库更新后需重跑 setup 同步；对预设这类低频变更资产，复制更稳。"
+      },
+      {
+        "nodeId": "twa-install-script",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "install.test.js 在临时 DSH_HOME 运行安装器，断言：组合文件不再含 __TEXT_WORKBENCH_SKILLS_DIR__、含 text-workbench-assistant-persona、SKILL.md 含 wb_resume_project；随后清理临时目录。"
+      },
+      {
+        "nodeId": "twa-install-verify",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "前置资产校验：安装开始前用 access 校验组合文件、预设文件与技能文件存在，任一缺失即失败退出，防止复制出残缺预设。"
+      },
+      {
+        "nodeId": "twa-install-verify",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. await access(agent.cordis.yml)；2. await access(preset.yml)；3. await access(skills/text-workbench/SKILL.md)；4. 全部通过才创建安装目录；任一失败抛错终止。"
+      },
+      {
+        "nodeId": "twa-install-replace",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "占位符替换：把组合文件中的 __TEXT_WORKBENCH_SKILLS_DIR__ 替换为安装后 skills 目录的绝对路径（反斜杠转正斜杠）。替换后组合文件成为可运行的安装产物。"
+      },
+      {
+        "nodeId": "twa-install-replace",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "占位符让「仓库内组合文件」与「安装后组合文件」可双向测试：源码保留占位符供 package.test.js 断言结构，安装后无占位符供 install.test.js 断言替换完成。一处替换、两侧验证。"
+      },
+      {
+        "nodeId": "twa-install-replace",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "验证问题：占位符是否被替换且路径可解析？通过标准：安装后组合文件 doesNotMatch /__TEXT_WORKBENCH_SKILLS_DIR__/ 且匹配绝对路径段；由 install.test.js 断言。"
+      },
+      {
+        "nodeId": "twa-dshhome",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "DSH_HOME 解析参数：安装根目录，默认 path.join(os.homedir(), '.dsh')，可用环境变量 DSH_HOME 覆盖。测试利用该参数把安装隔离到临时目录。"
+      },
+      {
+        "nodeId": "twa-dshhome",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "可覆盖的安装根是「可测试性」的前提：没有 DSH_HOME 环境变量，安装器只能写真实用户目录，测试就无法安全运行；参数化让隔离测试成为可能。"
+      },
+      {
+        "nodeId": "twa-install-preset",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "预设元数据文件（preset.yml）：name 为文本生成工作台助手，description 说明统一协作入口能力（任务台设计、循证写作、审查、版本审计与导出），order: 20 决定助手在 DSH 中的展示排序。"
+      },
+      {
+        "nodeId": "twa-install-preset",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：YAML 元数据；输出：DSH 助手列表中的名称、描述与排序位置。它是安装器复制的三个资产之一，也是包测试断言存在的文件。"
+      },
+      {
+        "nodeId": "twa-install-target",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "预设安装目标（DSH_HOME/.agent-presets/text-workbench-assistant-v0）：存放安装器产出的自包含预设副本，含 agent.cordis.yml（占位符已替换）、preset.yml 与 skills/。重启 DSH 后从助手列表选择文本生成工作台助手。"
+      },
+      {
+        "nodeId": "twa-install-target",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：三组仓库资产；输出：自包含目录。目录名与稳定助手键后缀一致（-v0），与恢复状态命名空间对齐。"
+      },
+      {
+        "nodeId": "twa-installed-composition",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "安装后组合文件：位于安装目标下的 agent.cordis.yml 副本，占位符已替换为安装后技能目录绝对路径，可被 DSH 直接加载。"
+      },
+      {
+        "nodeId": "twa-installed-skills",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "安装后技能副本：skills/ 目录的自包含副本，内含 text-workbench/SKILL.md；技能文件系统插件通过替换后的绝对路径装载它。"
+      },
+      {
+        "nodeId": "twa-install-plugindir",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "领域插件目录（~/.dsh/workbench-plugins/）：生成的论文、专利等任务台插件存放处，或用户确认的其他独立目录。它不属于本预设包，由 workbench-core 生成流程写入。"
+      },
+      {
+        "nodeId": "twa-install-plugindir",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：Plugin Spec（经 design 确认）；输出：可安装的领域插件包。目录独立于预设，保证预设更新不覆盖用户已装任务台。"
+      },
+      {
+        "nodeId": "twa-files-whitelist",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "files 白名单参数（package.json files）：限定发布内容为 agent.cordis.yml、preset.yml、skills、scripts、README.md，排除测试与内部文件。"
+      },
+      {
+        "nodeId": "twa-files-whitelist",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "白名单防止「测试文件/临时文件进入用户安装」：npm 包默认全量发布，显式 files 缩小暴露面，保证安装器复制的就是预设的完整内容。"
+      },
+      {
+        "nodeId": "twa-setup-cmd",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "setup 安装命令：npm run setup 执行 scripts/install-assets.mjs；安装流程为先装 Core 插件（dsh plugin add 相邻 workbench-core），再运行本命令，重启 DSH 后选择助手。"
+      },
+      {
+        "nodeId": "twa-setup-cmd",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. cd ..\\workbench-core && npm.cmd ci；2. dsh plugin --profile web add .；3. cd ..\\text-workbench-assistant && npm.cmd run setup；4. 重启 DSH；5. 选择「文本生成工作台助手」。"
+      },
+      {
+        "nodeId": "twa-peer-deps",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "运行依赖声明（peerDependencies）：@deepseek-ai/dsh 0.1.1-rc.2 与 dsh-workbench-core ^0.1.0，均 optional，避免在宿主未装 DSH 时安装失败。"
+      },
+      {
+        "nodeId": "twa-peer-deps",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "用可选 peer 依赖表达「预设运行需要 Core 但预设安装不捆绑 Core」：Core 由用户按 README 单独安装激活，保持预设薄与解耦；optional 使 npm 在无 DSH 环境也能装包。"
+      },
+      {
+        "nodeId": "twa-install-boundary",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "项目边界概念：本项目只包含 Agent Persona、Skill 与预设安装器；不包含 Workbench Runtime，不保存项目数据，不生成领域插件代码；workbench-core 是运行依赖必须单独安装激活；生成的领域任务台插件位于 ~/.dsh/workbench-plugins/ 或用户确认的其他独立目录。"
+      },
+      {
+        "nodeId": "twa-install-boundary",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "边界成立的依据：把「易变的 Agent 行为」与「需长期稳定的执行运行时」分成两个版本生命周期，预设可高频迭代而 Core 保持稳定；任何一方出问题都不影响另一方的安装与升级。"
+      },
+      {
+        "nodeId": "twa-install-boundary",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "薄预设换取解耦：项目自身体积小、审计面小、测试快，代价是用户必须额外安装 Core，安装步骤多一步；README 以显式步骤消解该成本。"
+      },
+      {
+        "nodeId": "twa-rt-policymode",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "assistant-policy 是 workbench-core 的策略运行模式：以单个统一助手（而非 Designer/Writer/Reviewer 三类分离角色）暴露治理能力，与 package.test.js 断言的不含 designer-policy/writer-policy/reviewer-policy 约束一致。"
+      },
+      {
+        "nodeId": "twa-rt-policymode",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "统一策略模式把角色约束从「多个预设」压缩为「一个预设 + 规则内部分段」：核心仍是同一套 wb_* 工具与状态机，但阶段边界改由 SKILL.md 与 Persona 规则表达，减少安装面。"
+      },
+      {
+        "nodeId": "twa-rt-policymode",
+        "type": "comparison",
+        "title": "同类方案比较",
+        "text": "对比对象：workbench-core 的多角色模式（designer-policy/writer-policy/reviewer-policy）。统一维度：治理能力如何暴露。差异：多角色模式把白名单固化到预设层，本方案由规则层在运行时约束；适用条件：单一助手场景用本方案，多角色严格隔离场景用多预设方案。"
+      },
+      {
+        "nodeId": "twa-rt-tools",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "wb_* 工具契约是 Persona 与 Core 之间的确定性接口面：阶段查询切换、恢复绑定、项目上限、工作台打开、快照检查点等工具组。Persona 只能通过这些工具操作项目，不能直接读写文件。成员准入：以 wb_ 前缀声明的确定性工具。"
+      },
+      {
+        "nodeId": "twa-rt-core",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "Core 核心运行时类别：归组 WorkbenchRuntime、JSON 项目存储、阶段状态机、工作台 HTTP 服务、插件加载器与 Plugin Spec。划分维度为「确定性执行层的组成部件」。"
+      },
+      {
+        "nodeId": "twa-rt-bundles",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "领域插件生成类别：归组任务台插件生成流程、论文任务台、专利任务台与生成插件目录。划分维度为「由 Spec 产出领域能力」。"
+      },
+      {
+        "nodeId": "twa-tool-stage",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段查询切换工具：wb_get_work_stage 读取当前阶段；wb_set_work_stage 迁移阶段（须 userConfirmed、稳定键、切换原因）。是阶段编排的运行时入口。"
+      },
+      {
+        "nodeId": "twa-tool-stage",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "wb_get_work_stage：输入稳定助手键；输出当前阶段。wb_set_work_stage：输入目标阶段 + userConfirmed + 稳定键 + 原因；输出迁移结果或拒绝。切换写操作受状态机校验。"
+      },
+      {
+        "nodeId": "twa-tool-resume",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "恢复绑定工具组：wb_get_resume_state（查上次项目与阶段）、wb_resume_project（恢复）、wb_bind_project（绑定）、wb_list_projects（列举）。支撑跨会话恢复与项目切换。"
+      },
+      {
+        "nodeId": "twa-tool-resume",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：稳定助手键、项目标识、用户确认；输出：恢复状态（项目+阶段）、绑定结果、项目列表。恢复与绑定操作都要求确认后才生效。"
+      },
+      {
+        "nodeId": "twa-tool-limit",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "项目上限工具：wb_get_project_limit 查询活跃项目数与上限（10），供创建项目前检查与驱逐决策使用。"
+      },
+      {
+        "nodeId": "twa-tool-limit",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：稳定助手键；输出：活跃项目数、上限值。返回的计数与 README/SKILL.md 声明的上限 10 一致。"
+      },
+      {
+        "nodeId": "twa-tool-open",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "工作台打开工具：wb_open_workbench 打开工作台页面；未指定项目时打开首页，指定项目时先绑定再打开。返回页面导航。"
+      },
+      {
+        "nodeId": "twa-tool-open",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：可选项目标识；输出：工作台页面。页面与对话共享 Core 存储与项目绑定。"
+      },
+      {
+        "nodeId": "twa-tool-version",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "快照检查点工具：wb_snapshot 创建内容快照并返回 revision；wb_checkpoint 保存长步骤检查点。write 阶段受控写入依赖它们实现版本与恢复。"
+      },
+      {
+        "nodeId": "twa-tool-version",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：项目标识、待保护内容范围、预期 revision；输出：快照记录、新 revision、检查点状态。写操作携带预期 revision 以检测并发冲突。"
+      },
+      {
+        "nodeId": "twa-core-runtime",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "WorkbenchRuntime：聚合项目、大纲、正文、材料、证据、快照、导出与 Run 流转等全部业务操作，通过 getBundle 装配当前任务类型的插件包。它是 Core 对外的门面组件。"
+      },
+      {
+        "nodeId": "twa-core-runtime",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "门面式聚合把「任务类型无关的执行」与「任务类型相关的领域逻辑」分层：Runtime 负责编排、校验与受控写入，领域差异全部由插件包提供，因此新增任务类型不改 Runtime。"
+      },
+      {
+        "nodeId": "twa-core-runtime",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "Core 侧由 npm test 覆盖；本预设侧通过工具契约测试（安装/包测试）间接守护 Runtime 依赖存在。生成应用的 npm test 做通用 Profile/状态往返测试。"
+      },
+      {
+        "nodeId": "twa-core-storage",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "JSON 项目存储：以单 JSON 文件持久化项目、会话绑定、Run、模板、材料与快照；所有写入经 updateProject 落盘并附带 updatedAt。是项目数据唯一事实来源。"
+      },
+      {
+        "nodeId": "twa-core-storage",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "单文件 JSON 换取简单与可审计：无数据库依赖、可整体备份与 diff；写入集中到 updateProject 使所有变更可追踪时间戳，支撑恢复与版本机制。"
+      },
+      {
+        "nodeId": "twa-core-statemachine",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "阶段状态机：按插件 stateTable 构建可配置状态机，负责 revision 冲突检测、事件合法性、步骤记录、预算计数与配置跳级。是「阶段即权限」的执行载体。"
+      },
+      {
+        "nodeId": "twa-core-statemachine",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "状态机把治理从提示词提升为可判定逻辑：事件迁移必须命中 stateTable 定义的合法边，revision 不匹配即拒绝写入；所有迁移留痕，供审计与恢复。"
+      },
+      {
+        "nodeId": "twa-core-statemachine",
+        "type": "validation",
+        "title": "验证方式",
+        "text": "验证问题：非法迁移是否被拒、revision 冲突是否检出？通过标准：状态机测试覆盖非法事件拒绝与 revision 冲突返回；本预设经 package.test.js 断言相关工具存在。"
+      },
+      {
+        "nodeId": "twa-core-server",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "工作台 HTTP 服务：提供双栏可拖拽编辑 UI 与项目/大纲/正文/材料/Run/模板等 REST API；端口占用时自动回退到下一端口。是页面视图的承载层。"
+      },
+      {
+        "nodeId": "twa-core-server",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：HTTP 请求（页面与 API）；输出：工作台 UI、REST 响应。服务端启动由入口 ensureServer 触发并持有。"
+      },
+      {
+        "nodeId": "twa-core-loader",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "插件加载器：维护 framework/logic/evidence/material 四层注册表与导出器注册表，按 taskType 解析完整插件包，并校验外部插件 manifest（apiVersion=2）。"
+      },
+      {
+        "nodeId": "twa-core-loader",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "四层注册表把领域插件固定为 Framework（大纲与状态机）/Logic（写作逻辑）/Evidence（证据机制）/Material（材料适配）结构，加载器按 taskType 组合，实现「新增任务=新增插件包」的扩展模型。"
+      },
+      {
+        "nodeId": "twa-core-pluginspec",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "Plugin Spec：声明式领域规格（documentSchema、workflow.stateTable、materialSchema 等），是任务工作台的唯一事实来源；生成的 JS 只加载 JSON 并接入通用运行时。"
+      },
+      {
+        "nodeId": "twa-core-pluginspec",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "以数据驱动而非代码驱动：Spec 是纯声明，可被 design 阶段校验、被生成器编译、被运行时解释，同一份 Spec 贯通「设计—生成—运行」全链路。"
+      },
+      {
+        "nodeId": "twa-bundle-generate",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "任务台插件生成流程：由 Plugin Spec 生成隔离的可安装插件包（package.json、manifest、spec、cordis.patch.yml 与四层源码），输出到独立目录并自验证。"
+      },
+      {
+        "nodeId": "twa-bundle-generate",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. design 确认 Plugin Spec；2. 生成器以 Spec 为唯一事实来源；3. 生成四层插件源码与 manifest；4. 写入隔离目录（~/.dsh/workbench-plugins/ 或确认目录）；5. 自验证包结构；6. 用户安装并指定任务台。"
+      },
+      {
+        "nodeId": "twa-bundle-thesis",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "论文任务台插件：论文 Framework/Logic/Evidence/Material 四层插件（章节大纲与状态机、章节写作逻辑、GB/T 7714 引用证据、文献/数据/图分类材料）。由生成流程产出。"
+      },
+      {
+        "nodeId": "twa-bundle-thesis",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：论文 Plugin Spec；输出：可安装的论文任务台插件包，装入领域插件目录后被 Runtime 按 taskType 解析。"
+      },
+      {
+        "nodeId": "twa-bundle-patent",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "专利任务台插件：专利 Framework/Logic/Evidence/Material 四层插件（五书结构、权利要求逻辑、现有技术引用、交底/现有技术分类材料）。与论文插件同构。"
+      },
+      {
+        "nodeId": "twa-bundle-patent",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：专利 Plugin Spec；输出：可安装的专利任务台插件包。复用论文插件的可插拔结构迁移而来。"
+      },
+      {
+        "nodeId": "twa-bundle-dir",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "生成插件目录（~/.dsh/workbench-plugins/）：存放生成的领域插件包；独立于预设安装目录，预设升级不影响已装任务台。用户可确认其他目录。"
+      },
+      {
+        "nodeId": "twa-test-cases",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "测试用例类别：归组 install.test.js 与 package.test.js 及其断言机制。划分维度为「守护对象」：安装器产物 vs 预设包结构。"
+      },
+      {
+        "nodeId": "twa-test-cmds",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "验证命令类别：归组 npm test、npm run check 与测试通过标准。划分维度为「验证的执行入口与判定」。"
+      },
+      {
+        "nodeId": "twa-test-install",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "安装器测试（test/install.test.js）：在临时 DSH_HOME 运行 scripts/install-assets.mjs，断言安装目录生成、组合文件不再含 __TEXT_WORKBENCH_SKILLS_DIR__、含 persona 引用、SKILL.md 含 wb_resume_project，最后清理临时目录。"
+      },
+      {
+        "nodeId": "twa-test-install",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. mkdtemp 创建临时 DSH_HOME；2. spawn node scripts/install-assets.mjs（env.DSH_HOME=临时目录）；3. 读取安装后组合文件与技能文件；4. 断言无占位符、含 persona、含 wb_resume_project；5. finally rm 临时目录。"
+      },
+      {
+        "nodeId": "twa-test-install",
+        "type": "engineering_tradeoff",
+        "title": "工程取舍",
+        "text": "用真实子进程运行安装器换取端到端可信：不是 mock 复制逻辑，而是验证真实脚本行为；代价是测试依赖 Node 环境可用（windowsHide 处理跨平台）。"
+      },
+      {
+        "nodeId": "twa-test-isolated",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "隔离 DSH_HOME 测试：利用 DSH_HOME 环境变量把安装器输出重定向到临时目录，避免污染真实用户 ~/.dsh；测试结束清理临时目录。"
+      },
+      {
+        "nodeId": "twa-test-isolated",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "隔离性的依据：安装器默认写用户主目录，直接运行会留下不可控状态；参数化 DSH_HOME 让测试成为无副作用操作，可反复运行、可并行。"
+      },
+      {
+        "nodeId": "twa-test-selfcontain",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "自包含断言：断言安装后组合文件不再含占位符、含 text-workbench-assistant-persona、安装后 SKILL.md 含 wb_resume_project——即「安装目标可独立运行」。它是 install 用例的判定核心。"
+      },
+      {
+        "nodeId": "twa-test-selfcontain",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 读 installedRoot/agent.cordis.yml；2. assert.doesNotMatch(占位符)；3. assert.match(persona 引用)；4. 读 skills 副本；5. assert.match(wb_resume_project)。全部通过则自包含成立。"
+      },
+      {
+        "nodeId": "twa-test-package",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "预设包测试（test/package.test.js）：断言 preset.yml 与 SKILL.md 存在、组合含 mode: assistant-policy 且不含 designer/writer/reviewer 分离策略、SKILL.md 引用 wb_get_resume_state 与 wb_get_project_limit，守护统一助手结构不被破坏。"
+      },
+      {
+        "nodeId": "twa-test-package",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 断言 preset.yml 存在；2. 断言 skills/text-workbench/SKILL.md 存在；3. 读组合文件，断言 mode: assistant-policy；4. 断言不含 designer-policy/writer-policy/reviewer-policy；5. 断言 SKILL.md 引用 wb_get_resume_state 与 wb_get_project_limit。"
+      },
+      {
+        "nodeId": "twa-test-unified",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "统一助手断言：断言组合采用 assistant-policy 模式且不含 Designer/Writer/Reviewer 分离角色策略，守住「单一统一助手」的架构决策。"
+      },
+      {
+        "nodeId": "twa-test-unified",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "把架构决策固化为可执行断言：一旦有人改回多角色模式或误加分离策略，测试立即失败；这是用测试守护「预设形态」的回归防线。"
+      },
+      {
+        "nodeId": "twa-test-skillref",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "技能引用断言：断言 SKILL.md 引用 wb_get_resume_state 与 wb_get_project_limit——即技能规则确实与 Core 工具面挂钩，规则文件未被架空。"
+      },
+      {
+        "nodeId": "twa-test-skillref",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. 读 SKILL.md；2. assert.match(/wb_get_resume_state/)；3. assert.match(/wb_get_project_limit/)；任一缺失即失败，提示规则文件与工具契约脱节。"
+      },
+      {
+        "nodeId": "twa-test-npm",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "npm test 命令：执行 node --test 运行 test/ 下全部用例。它是项目验证的标准入口（README 验证一节）。"
+      },
+      {
+        "nodeId": "twa-test-npm",
+        "type": "inputs_outputs",
+        "title": "输入与输出",
+        "text": "输入：test 目录用例；输出：测试报告与退出码。退出 0 = 全部通过。"
+      },
+      {
+        "nodeId": "twa-test-check",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "npm run check 命令：先 node --check 语法检查安装器脚本，再 node --test 跑测试；比 npm test 多一层语法守护。"
+      },
+      {
+        "nodeId": "twa-test-check",
+        "type": "procedure",
+        "title": "运行流程",
+        "text": "1. node --check scripts/install-assets.mjs（语法检查）；2. node --test（全部用例）；3. 任一失败则退出非 0。"
+      },
+      {
+        "nodeId": "twa-test-pass",
+        "type": "definition",
+        "title": "定义与边界",
+        "text": "测试通过标准：全部 node:test 用例通过且语法检查退出 0；README 将 npm test 与 npm run check 列为验证步骤。测量对象：安装器产物与预设包结构。"
+      },
+      {
+        "nodeId": "twa-test-pass",
+        "type": "principle",
+        "title": "设计机制",
+        "text": "以退出码为判定而非人工目测：CI 与本地可同一标准；两个用例恰好覆盖「装得上」与「结构对」两个交付风险面。"
+      }
+    ],
+    "relations": [
+      {
+        "sourceId": "twa-entry",
+        "targetId": "text-workbench-assistant",
+        "type": "PART_OF",
+        "rationale": "DSH 预设组合是助手架构的接入层"
+      },
+      {
+        "sourceId": "twa-persona",
+        "targetId": "text-workbench-assistant",
+        "type": "PART_OF",
+        "rationale": "Persona 与阶段编排是助手架构的交互层"
+      },
+      {
+        "sourceId": "twa-skill",
+        "targetId": "text-workbench-assistant",
+        "type": "PART_OF",
+        "rationale": "协作 Skill 治理是助手架构的规则层"
+      },
+      {
+        "sourceId": "twa-install",
+        "targetId": "text-workbench-assistant",
+        "type": "PART_OF",
+        "rationale": "安装与交付是助手架构的交付层"
+      },
+      {
+        "sourceId": "twa-runtime",
+        "targetId": "text-workbench-assistant",
+        "type": "PART_OF",
+        "rationale": "workbench-core 运行依赖是助手架构的确定性执行层"
+      },
+      {
+        "sourceId": "twa-test",
+        "targetId": "text-workbench-assistant",
+        "type": "PART_OF",
+        "rationale": "验证与测试是助手架构的质量保障层"
+      },
+      {
+        "sourceId": "twa-entry-policy",
+        "targetId": "twa-rt-policymode",
+        "type": "IMPLEMENTS",
+        "rationale": "策略插件实例以 assistant-policy 模式挂载 Core 治理能力"
+      },
+      {
+        "sourceId": "twa-rt-policymode",
+        "targetId": "twa-rt-tools",
+        "type": "PREREQUISITE_OF",
+        "rationale": "策略模式决定 wb_* 工具以统一助手形态暴露"
+      },
+      {
+        "sourceId": "twa-entry-skillfiles",
+        "targetId": "twa-skill-file",
+        "type": "INPUT_TO",
+        "rationale": "技能文件系统插件装载协作 SKILL.md"
+      },
+      {
+        "sourceId": "twa-entry-provider",
+        "targetId": "twa-entry-skillfiles",
+        "type": "INPUT_TO",
+        "rationale": "providerName 配置限定技能装载范围"
+      },
+      {
+        "sourceId": "twa-skill-file",
+        "targetId": "twa-persona-stage",
+        "type": "INPUT_TO",
+        "rationale": "协作技能规则指导 Persona 的三阶段行为"
+      },
+      {
+        "sourceId": "twa-rt-tools",
+        "targetId": "twa-persona-stage",
+        "type": "INPUT_TO",
+        "rationale": "wb_* 工具契约被阶段编排调用"
+      },
+      {
+        "sourceId": "twa-stage-query",
+        "targetId": "twa-tool-stage",
+        "type": "INPUT_TO",
+        "rationale": "阶段查询机制调用 wb_get_work_stage"
+      },
+      {
+        "sourceId": "twa-stage-switch-confirm",
+        "targetId": "twa-tool-stage",
+        "type": "INPUT_TO",
+        "rationale": "阶段切换确认调用 wb_set_work_stage"
+      },
+      {
+        "sourceId": "twa-resume-state",
+        "targetId": "twa-tool-resume",
+        "type": "INPUT_TO",
+        "rationale": "恢复状态机制调用恢复绑定工具组"
+      },
+      {
+        "sourceId": "twa-bind-project",
+        "targetId": "twa-tool-resume",
+        "type": "INPUT_TO",
+        "rationale": "项目绑定机制调用 wb_bind_project"
+      },
+      {
+        "sourceId": "twa-limit-govern",
+        "targetId": "twa-tool-limit",
+        "type": "INPUT_TO",
+        "rationale": "上限治理调用 wb_get_project_limit"
+      },
+      {
+        "sourceId": "twa-open-workbench",
+        "targetId": "twa-tool-open",
+        "type": "INPUT_TO",
+        "rationale": "工作台打开调用 wb_open_workbench"
+      },
+      {
+        "sourceId": "twa-snapshot-version",
+        "targetId": "twa-tool-version",
+        "type": "INPUT_TO",
+        "rationale": "快照版本机制调用快照检查点工具"
+      },
+      {
+        "sourceId": "twa-checkpoint-resume",
+        "targetId": "twa-tool-version",
+        "type": "INPUT_TO",
+        "rationale": "检查点恢复调用 checkpoint 工具"
+      },
+      {
+        "sourceId": "twa-entry-stablekey",
+        "targetId": "twa-resume-state",
+        "type": "INPUT_TO",
+        "rationale": "稳定助手键是恢复状态查询的标识输入"
+      },
+      {
+        "sourceId": "twa-entry-stablekey",
+        "targetId": "twa-bind-project",
+        "type": "INPUT_TO",
+        "rationale": "项目绑定携带稳定助手键"
+      },
+      {
+        "sourceId": "twa-spec-create",
+        "targetId": "twa-double-confirm",
+        "type": "INPUT_TO",
+        "rationale": "Spec 校验通过后进入目录与安装双重确认"
+      },
+      {
+        "sourceId": "twa-app-scenarios",
+        "targetId": "twa-design-flow",
+        "type": "INPUT_TO",
+        "rationale": "任务场景类型是 design 流程的输入"
+      },
+      {
+        "sourceId": "twa-evidence-bind",
+        "targetId": "twa-write-flow",
+        "type": "PART_OF",
+        "rationale": "证据绑定是 write 流程的组成部分"
+      },
+      {
+        "sourceId": "twa-snapshot-version",
+        "targetId": "twa-write-flow",
+        "type": "PART_OF",
+        "rationale": "快照版本是 write 流程的组成部分"
+      },
+      {
+        "sourceId": "twa-tool-scope",
+        "targetId": "twa-problem-bypass",
+        "type": "MITIGATES",
+        "rationale": "阶段工具白名单缓解阶段绕过风险"
+      },
+      {
+        "sourceId": "twa-confirm-gate",
+        "targetId": "twa-problem-bypass",
+        "type": "MITIGATES",
+        "rationale": "用户确认门缓解阶段绕过风险"
+      },
+      {
+        "sourceId": "twa-auth-boundary",
+        "targetId": "twa-problem-unauth",
+        "type": "MITIGATES",
+        "rationale": "授权读取边界缓解未授权读取风险"
+      },
+      {
+        "sourceId": "twa-checkpoint-resume",
+        "targetId": "twa-problem-duplicate",
+        "type": "MITIGATES",
+        "rationale": "检查点恢复缓解重复写入风险"
+      },
+      {
+        "sourceId": "twa-idempotency",
+        "targetId": "twa-problem-duplicate",
+        "type": "MITIGATES",
+        "rationale": "幂等键机制缓解重复写入风险"
+      },
+      {
+        "sourceId": "twa-dshhome",
+        "targetId": "twa-install-script",
+        "type": "INPUT_TO",
+        "rationale": "DSH_HOME 解析参数被安装器使用"
+      },
+      {
+        "sourceId": "twa-install-script",
+        "targetId": "twa-install-target",
+        "type": "INPUT_TO",
+        "rationale": "安装器写入预设安装目标目录"
+      },
+      {
+        "sourceId": "twa-install-replace",
+        "targetId": "twa-installed-composition",
+        "type": "INPUT_TO",
+        "rationale": "占位符替换产出安装后组合文件"
+      },
+      {
+        "sourceId": "twa-install-boundary",
+        "targetId": "twa-bundle-dir",
+        "type": "AFFECTS",
+        "rationale": "项目边界决定领域插件生成到独立目录而非本包"
+      },
+      {
+        "sourceId": "twa-files-whitelist",
+        "targetId": "twa-install-script",
+        "type": "PREREQUISITE_OF",
+        "rationale": "files 白名单决定安装器可复制的发布内容"
+      },
+      {
+        "sourceId": "twa-core-storage",
+        "targetId": "twa-core-runtime",
+        "type": "PREREQUISITE_OF",
+        "rationale": "JSON 存储是运行时项目读写的技术前置"
+      },
+      {
+        "sourceId": "twa-core-statemachine",
+        "targetId": "twa-core-runtime",
+        "type": "PREREQUISITE_OF",
+        "rationale": "状态机是运行时任务流转的技术前置"
+      },
+      {
+        "sourceId": "twa-core-loader",
+        "targetId": "twa-core-runtime",
+        "type": "PREREQUISITE_OF",
+        "rationale": "插件加载是运行时装配领域能力的技术前置"
+      },
+      {
+        "sourceId": "twa-core-pluginspec",
+        "targetId": "twa-core-loader",
+        "type": "PREREQUISITE_OF",
+        "rationale": "Plugin Spec 契约是插件注册校验的前置"
+      },
+      {
+        "sourceId": "twa-core-runtime",
+        "targetId": "twa-rt-tools",
+        "type": "IMPLEMENTS",
+        "rationale": "WorkbenchRuntime 实现 wb_* 工具契约"
+      },
+      {
+        "sourceId": "twa-core-pluginspec",
+        "targetId": "twa-bundle-generate",
+        "type": "INPUT_TO",
+        "rationale": "Plugin Spec 是任务台插件生成的唯一事实来源"
+      },
+      {
+        "sourceId": "twa-bundle-thesis",
+        "targetId": "twa-bundle-patent",
+        "type": "SIMILAR_TO",
+        "rationale": "论文与专利插件包同构，均按四层组织"
+      },
+      {
+        "sourceId": "twa-same-source",
+        "targetId": "twa-shared-store",
+        "type": "PREREQUISITE_OF",
+        "rationale": "对话页面同源是共享存储绑定的语义前提"
+      },
+      {
+        "sourceId": "twa-install-script",
+        "targetId": "twa-test-install",
+        "type": "EVALUATED_BY",
+        "rationale": "安装器由 install.test.js 在隔离 DSH_HOME 评估"
+      },
+      {
+        "sourceId": "twa-entry-composition",
+        "targetId": "twa-test-package",
+        "type": "EVALUATED_BY",
+        "rationale": "组合结构由 package.test.js 断言守护"
+      },
+      {
+        "sourceId": "twa-test-isolated",
+        "targetId": "twa-test-install",
+        "type": "INPUT_TO",
+        "rationale": "隔离 DSH_HOME 是安装器测试的运行前提"
+      }
+    ]
+  },
+  "generatedBy": "host-llm",
+  "mode": "full",
+  "phase": "full",
+  "confirmedMvp": true,
+  "mvpConfirmation": {
+    "confirmed": true,
+    "approvedBudget": {
+      "durationMinutes": [
+        25,
+        35
+      ],
+      "visitTopicCount": [
+        80,
+        300
+      ],
+      "maxModelCalls": 4096
+    },
+    "confirmedAt": "2026-09-09T00:00:00.000Z"
+  }
+}

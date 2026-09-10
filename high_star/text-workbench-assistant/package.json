@@ -1,0 +1,37 @@
+{
+  "name": "dsh-text-workbench-assistant",
+  "version": "0.1.0",
+  "description": "Unified DSH Agent preset for designing, using, and reviewing governed text workbenches.",
+  "type": "module",
+  "files": [
+    "agent.cordis.yml",
+    "preset.yml",
+    "skills",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "setup": "node scripts/install-assets.mjs",
+    "test": "node --test",
+    "check": "node --check scripts/install-assets.mjs && node --test"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-agent-preset",
+    "workbench",
+    "text-generation",
+    "agent"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "0.1.1-rc.2",
+    "dsh-workbench-core": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": { "optional": true },
+    "dsh-workbench-core": { "optional": true }
+  }
+}

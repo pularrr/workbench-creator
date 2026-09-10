@@ -1,0 +1,15 @@
+node_modules/
+.runtime/
+coverage/
+*.log
+tmp-debug-state*.json
+workbench-state.json
+generated-plugins/
+.env
+.env.*
+.vscode/
+.idea/
+thesis-agent/node_modules/
+thesis-agent/.runtime/
+thesis-agent/coverage/
+thesis-agent/*.log

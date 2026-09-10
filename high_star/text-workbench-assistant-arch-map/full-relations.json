@@ -1,0 +1,58 @@
+{
+  "relations": [
+    { "sourceId": "twa-entry", "targetId": "text-workbench-assistant", "type": "PART_OF", "rationale": "DSH 预设组合是助手架构的接入层" },
+    { "sourceId": "twa-persona", "targetId": "text-workbench-assistant", "type": "PART_OF", "rationale": "Persona 与阶段编排是助手架构的交互层" },
+    { "sourceId": "twa-skill", "targetId": "text-workbench-assistant", "type": "PART_OF", "rationale": "协作 Skill 治理是助手架构的规则层" },
+    { "sourceId": "twa-install", "targetId": "text-workbench-assistant", "type": "PART_OF", "rationale": "安装与交付是助手架构的交付层" },
+    { "sourceId": "twa-runtime", "targetId": "text-workbench-assistant", "type": "PART_OF", "rationale": "workbench-core 运行依赖是助手架构的确定性执行层" },
+    { "sourceId": "twa-test", "targetId": "text-workbench-assistant", "type": "PART_OF", "rationale": "验证与测试是助手架构的质量保障层" },
+
+    { "sourceId": "twa-entry-policy", "targetId": "twa-rt-policymode", "type": "IMPLEMENTS", "rationale": "策略插件实例以 assistant-policy 模式挂载 Core 治理能力" },
+    { "sourceId": "twa-rt-policymode", "targetId": "twa-rt-tools", "type": "PREREQUISITE_OF", "rationale": "策略模式决定 wb_* 工具以统一助手形态暴露" },
+    { "sourceId": "twa-entry-skillfiles", "targetId": "twa-skill-file", "type": "INPUT_TO", "rationale": "技能文件系统插件装载协作 SKILL.md" },
+    { "sourceId": "twa-entry-provider", "targetId": "twa-entry-skillfiles", "type": "INPUT_TO", "rationale": "providerName 配置限定技能装载范围" },
+    { "sourceId": "twa-skill-file", "targetId": "twa-persona-stage", "type": "INPUT_TO", "rationale": "协作技能规则指导 Persona 的三阶段行为" },
+    { "sourceId": "twa-rt-tools", "targetId": "twa-persona-stage", "type": "INPUT_TO", "rationale": "wb_* 工具契约被阶段编排调用" },
+
+    { "sourceId": "twa-stage-query", "targetId": "twa-tool-stage", "type": "INPUT_TO", "rationale": "阶段查询机制调用 wb_get_work_stage" },
+    { "sourceId": "twa-stage-switch-confirm", "targetId": "twa-tool-stage", "type": "INPUT_TO", "rationale": "阶段切换确认调用 wb_set_work_stage" },
+    { "sourceId": "twa-resume-state", "targetId": "twa-tool-resume", "type": "INPUT_TO", "rationale": "恢复状态机制调用恢复绑定工具组" },
+    { "sourceId": "twa-bind-project", "targetId": "twa-tool-resume", "type": "INPUT_TO", "rationale": "项目绑定机制调用 wb_bind_project" },
+    { "sourceId": "twa-limit-govern", "targetId": "twa-tool-limit", "type": "INPUT_TO", "rationale": "上限治理调用 wb_get_project_limit" },
+    { "sourceId": "twa-open-workbench", "targetId": "twa-tool-open", "type": "INPUT_TO", "rationale": "工作台打开调用 wb_open_workbench" },
+    { "sourceId": "twa-snapshot-version", "targetId": "twa-tool-version", "type": "INPUT_TO", "rationale": "快照版本机制调用快照检查点工具" },
+    { "sourceId": "twa-checkpoint-resume", "targetId": "twa-tool-version", "type": "INPUT_TO", "rationale": "检查点恢复调用 checkpoint 工具" },
+
+    { "sourceId": "twa-entry-stablekey", "targetId": "twa-resume-state", "type": "INPUT_TO", "rationale": "稳定助手键是恢复状态查询的标识输入" },
+    { "sourceId": "twa-entry-stablekey", "targetId": "twa-bind-project", "type": "INPUT_TO", "rationale": "项目绑定携带稳定助手键" },
+    { "sourceId": "twa-spec-create", "targetId": "twa-double-confirm", "type": "INPUT_TO", "rationale": "Spec 校验通过后进入目录与安装双重确认" },
+    { "sourceId": "twa-app-scenarios", "targetId": "twa-design-flow", "type": "INPUT_TO", "rationale": "任务场景类型是 design 流程的输入" },
+    { "sourceId": "twa-evidence-bind", "targetId": "twa-write-flow", "type": "PART_OF", "rationale": "证据绑定是 write 流程的组成部分" },
+    { "sourceId": "twa-snapshot-version", "targetId": "twa-write-flow", "type": "PART_OF", "rationale": "快照版本是 write 流程的组成部分" },
+
+    { "sourceId": "twa-tool-scope", "targetId": "twa-problem-bypass", "type": "MITIGATES", "rationale": "阶段工具白名单缓解阶段绕过风险" },
+    { "sourceId": "twa-confirm-gate", "targetId": "twa-problem-bypass", "type": "MITIGATES", "rationale": "用户确认门缓解阶段绕过风险" },
+    { "sourceId": "twa-auth-boundary", "targetId": "twa-problem-unauth", "type": "MITIGATES", "rationale": "授权读取边界缓解未授权读取风险" },
+    { "sourceId": "twa-checkpoint-resume", "targetId": "twa-problem-duplicate", "type": "MITIGATES", "rationale": "检查点恢复缓解重复写入风险" },
+    { "sourceId": "twa-idempotency", "targetId": "twa-problem-duplicate", "type": "MITIGATES", "rationale": "幂等键机制缓解重复写入风险" },
+
+    { "sourceId": "twa-dshhome", "targetId": "twa-install-script", "type": "INPUT_TO", "rationale": "DSH_HOME 解析参数被安装器使用" },
+    { "sourceId": "twa-install-script", "targetId": "twa-install-target", "type": "INPUT_TO", "rationale": "安装器写入预设安装目标目录" },
+    { "sourceId": "twa-install-replace", "targetId": "twa-installed-composition", "type": "INPUT_TO", "rationale": "占位符替换产出安装后组合文件" },
+    { "sourceId": "twa-install-boundary", "targetId": "twa-bundle-dir", "type": "AFFECTS", "rationale": "项目边界决定领域插件生成到独立目录而非本包" },
+    { "sourceId": "twa-files-whitelist", "targetId": "twa-install-script", "type": "PREREQUISITE_OF", "rationale": "files 白名单决定安装器可复制的发布内容" },
+
+    { "sourceId": "twa-core-storage", "targetId": "twa-core-runtime", "type": "PREREQUISITE_OF", "rationale": "JSON 存储是运行时项目读写的技术前置" },
+    { "sourceId": "twa-core-statemachine", "targetId": "twa-core-runtime", "type": "PREREQUISITE_OF", "rationale": "状态机是运行时任务流转的技术前置" },
+    { "sourceId": "twa-core-loader", "targetId": "twa-core-runtime", "type": "PREREQUISITE_OF", "rationale": "插件加载是运行时装配领域能力的技术前置" },
+    { "sourceId": "twa-core-pluginspec", "targetId": "twa-core-loader", "type": "PREREQUISITE_OF", "rationale": "Plugin Spec 契约是插件注册校验的前置" },
+    { "sourceId": "twa-core-runtime", "targetId": "twa-rt-tools", "type": "IMPLEMENTS", "rationale": "WorkbenchRuntime 实现 wb_* 工具契约" },
+    { "sourceId": "twa-core-pluginspec", "targetId": "twa-bundle-generate", "type": "INPUT_TO", "rationale": "Plugin Spec 是任务台插件生成的唯一事实来源" },
+    { "sourceId": "twa-bundle-thesis", "targetId": "twa-bundle-patent", "type": "SIMILAR_TO", "rationale": "论文与专利插件包同构，均按四层组织" },
+
+    { "sourceId": "twa-same-source", "targetId": "twa-shared-store", "type": "PREREQUISITE_OF", "rationale": "对话页面同源是共享存储绑定的语义前提" },
+    { "sourceId": "twa-install-script", "targetId": "twa-test-install", "type": "EVALUATED_BY", "rationale": "安装器由 install.test.js 在隔离 DSH_HOME 评估" },
+    { "sourceId": "twa-entry-composition", "targetId": "twa-test-package", "type": "EVALUATED_BY", "rationale": "组合结构由 package.test.js 断言守护" },
+    { "sourceId": "twa-test-isolated", "targetId": "twa-test-install", "type": "INPUT_TO", "rationale": "隔离 DSH_HOME 是安装器测试的运行前提" }
+  ]
+}

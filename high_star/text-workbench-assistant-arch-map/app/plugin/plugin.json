@@ -1,0 +1,133 @@
+{
+  "name": "knowmap-plugin",
+  "version": "0.1.0",
+  "description": "可插拔的通用 LLM 能力插件——将知识图谱应用的构建过程沉淀为插件，由通用 LLM 根据生成任务对不同 Profile 进行设计和主题内容生成。",
+  "schemaVersion": "knowmap-plugin/1",
+  "author": "knowmap-agent",
+  "license": "MIT",
+  "entry": {
+    "skill": "SKILL.md",
+    "contracts": "contracts/index.ts",
+    "workflows": "workflows/",
+    "prompts": "prompts/",
+    "examples": "examples/",
+    "discovery": "discovery.mjs",
+    "cli": "../scripts/knowmap.mjs"
+  },
+  "contracts": {
+    "TaskProfile": "contracts/task-profile.ts",
+    "ResearchCandidate": "contracts/research-candidate.ts",
+    "MvpOutput": "contracts/mvp-output.ts",
+    "PluginState": "contracts/plugin-state.ts"
+  },
+  "profiles": {},
+  "capabilities": [
+    "profile-design",
+    "mvp-generation",
+    "full-development",
+    "adaptive-research",
+    "batch-merge",
+    "semantic-review",
+    "structural-validation",
+    "knowledge-ingest",
+    "deep-search",
+    "distributed-subcalls"
+  ],
+  "mvpMechanism": {
+    "enabled": true,
+    "phase1": {
+      "name": "MVP 快速生成",
+      "nodeCount": [
+        15,
+        30
+      ],
+      "reactRounds": [
+        2,
+        3
+      ],
+      "sectionsFilled": [
+        "definition"
+      ],
+      "domainCount": [
+        3,
+        5
+      ],
+      "durationMinutes": [
+        2,
+        5
+      ],
+      "webSearch": true,
+      "maxExternalSearches": 2
+    },
+    "phase2": {
+      "name": "用户确认与调整",
+      "adjustmentDirections": [
+        3,
+        5
+      ],
+      "lockDesignOnConfirm": true
+    },
+    "phase3": {
+      "name": "完整开发",
+      "nodeCount": [
+        80,
+        150
+      ],
+      "reactRounds": [
+        6,
+        24
+      ],
+      "rootBudgetMinutes": [
+        25,
+        35
+      ],
+      "durationMinutes": [
+        20,
+        35
+      ],
+      "webSearch": true
+    }
+  },
+  "nodeGranularity": {
+    "enabled": true,
+    "rules": [
+      "一个节点只放一个东西，由 nodeType 硬编码决定",
+      "concept=一个概念，method/algorithm=一个解决方案，problem=一个问题或现象",
+      "problem 节点禁止混入解决方法或子问题",
+      "多个并列概念必须拆分为子节点，共享共性父节点",
+      "节点名称 ≤20 字，shortFact ≤80 字"
+    ],
+    "validationRules": [
+      "MULTI_CONCEPT_NODE",
+      "NODE_NAME_TOO_LONG",
+      "SHORTFACT_TOO_LONG",
+      "PROBLEM_NODE_HAS_SOLUTION"
+    ]
+  },
+  "sharedInfrastructure": {
+    "description": "以下基础设施所有 Profile 共享，不随主题变化",
+    "components": [
+      "应用架构（Next.js + React + TypeScript）",
+      "Agent Loop（ReAct + 自适应预算 + 批量合并）",
+      "审查框架（语义审查 + 结构校验 + fail-open）",
+      "UI 组件（SVG 图谱画布 + 知识树 + 知识卡 + Agent 面板）",
+      "SSE 流式聊天 + Markdown/LaTeX 渲染",
+      "后台任务管理",
+      "分布式子调用",
+      "节点粒度 4 条审查规则",
+      "结构性规则（树/图/公式/卡片）"
+    ]
+  },
+  "developmentStatus": {
+    "implementation": "local-validation",
+    "real-provider-e2e": "not-verified"
+  },
+  "keywords": [
+    "knowledge-graph",
+    "llm-agent",
+    "plugin",
+    "profile",
+    "adaptive-research",
+    "mvp-first"
+  ]
+}

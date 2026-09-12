@@ -23,11 +23,25 @@
  *   const tools = exposeTools(runtime, { platform: 'dsh' })
  */
 
+import { assertToolAllowedForStage, getWorkStageInfo, setWorkStage } from './work-stage.js'
+
 // ─── 工具定义表 ────────────────────────────────────────────────────────────
 // 每个工具：name / description / parameters(JSON Schema) / execute(args)
 
-function buildToolDefs(runtime, sessionId) {
+function buildToolDefs(runtime, sessionId, options = {}) {
   return [
+    {
+      name: 'wb_get_work_stage',
+      description: '获取当前会话持久化的 design/write/review 阶段和允许工具。',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: () => getWorkStageInfo(runtime, sessionId),
+    },
+    {
+      name: 'wb_set_work_stage',
+      description: '在用户明确确认后切换当前会话的工作阶段。write 和 review 要求已绑定项目。',
+      parameters: { type: 'object', properties: { stage: { type: 'string', enum: ['design', 'write', 'review'] }, reason: { type: 'string' }, userConfirmed: { type: 'boolean' }, assistantKey: { type: 'string' } }, required: ['stage', 'userConfirmed'] },
+      execute: (args) => setWorkStage(runtime, sessionId, args.stage, args),
+    },
     // ─── 项目管理 ────────────────────────────────────────────────────────
     {
       name: 'wb_list_projects',
@@ -45,7 +59,11 @@ function buildToolDefs(runtime, sessionId) {
           taskType: { type: 'string', description: '任务类型', enum: ['thesis', 'patent', 'contract', 'tech-report', 'research-proposal', 'clinical-trial', 'generic'] },
           title: { type: 'string', description: '文档正式标题（可选）' },
           targetWords: { type: 'number', description: '目标总字数（可选，默认 30000）' },
+          patentType: { type: 'string', enum: ['invention', 'utility_model'], description: '专利类型；与 domainFields.patentType 同时提供时必须一致' },
+          domainFields: { type: 'object', additionalProperties: true, description: '任务专属字段；专利的 domainFields.patentType 与 patentType 等价' },
           metadata: { type: 'object', additionalProperties: true, description: '额外元数据（可选）' },
+          assistantKey: { type: 'string', description: '用于跨 DSH 重启恢复的稳定助手键' },
+          confirmedEviction: { type: 'boolean', description: '达到 10 个项目上限时，用户确认归档最早项目后传 true' },
         },
         required: ['name', 'taskType'],
       },
@@ -56,14 +74,75 @@ function buildToolDefs(runtime, sessionId) {
       },
     },
     {
+      name: 'wb_get_project_limit',
+      description: '获取活跃项目上限、当前数量及可能被归档的最早项目。',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: () => runtime.getProjectLimit(),
+    },
+    {
+      name: 'wb_get_resume_state',
+      description: '查询当前会话或稳定助手键上次绑定的项目和阶段。',
+      parameters: { type: 'object', properties: { assistantKey: { type: 'string' } }, required: ['assistantKey'] },
+      execute: (args) => runtime.getResumeState(sessionId, args.assistantKey),
+    },
+    {
+      name: 'wb_resume_project',
+      description: '用户确认后，把新会话重新绑定到上次项目并恢复阶段。',
+      parameters: { type: 'object', properties: { assistantKey: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['assistantKey', 'userConfirmed'] },
+      execute: (args) => {
+        if (args.userConfirmed !== true) throw new Error('Resuming a project requires explicit user confirmation')
+        return runtime.resumeProject(sessionId, args.assistantKey)
+      },
+    },
+    {
+      name: 'wb_unbind_project',
+      description: '解除当前会话项目绑定并返回 design 阶段。',
+      parameters: { type: 'object', properties: { assistantKey: { type: 'string' } }, required: [] },
+      execute: (args) => runtime.unbindProject(sessionId, args),
+    },
+    {
+      name: 'wb_list_archived_projects',
+      description: '列出因用户操作或项目上限而归档的项目。',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: () => runtime.listArchivedProjects(),
+    },
+    {
+      name: 'wb_restore_archived_project',
+      description: '容量允许且用户确认后恢复归档项目。',
+      parameters: { type: 'object', properties: { projectId: { type: 'string' }, assistantKey: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['projectId', 'userConfirmed'] },
+      execute: (args) => {
+        if (args.userConfirmed !== true) throw new Error('Restoring a project requires explicit user confirmation')
+        return runtime.restoreArchivedProject(args.projectId, { sessionId, assistantKey: args.assistantKey })
+      },
+    },
+    {
       name: 'wb_delete_project',
-      description: '永久删除指定项目。删除后应告知用户项目已删除，并提示选择或创建新项目。',
+      description: '经用户确认后归档指定项目。项目离开活跃列表，但仍可恢复。',
       parameters: {
         type: 'object',
-        properties: { projectId: { type: 'string', description: '要删除的项目 ID' } },
-        required: ['projectId'],
+        properties: { projectId: { type: 'string', description: '要归档的项目 ID' }, userConfirmed: { type: 'boolean' } },
+        required: ['projectId', 'userConfirmed'],
       },
-      execute: (args) => runtime.deleteProject(args.projectId),
+      execute: (args) => {
+        if (args.userConfirmed !== true) throw new Error('Archiving a project requires explicit user confirmation')
+        return runtime.deleteProject(args.projectId)
+      },
+    },
+    {
+      name: 'wb_update_logic_block',
+      description: '更新当前项目一个行文逻辑块的目标、论点、过渡、证据要求或风格约束。',
+      parameters: { type: 'object', properties: { logicBlockId: { type: 'string' }, purpose: { type: 'string' }, transition: { type: 'string' }, claim: { type: 'string' }, evidenceRequirement: { type: 'string' }, styleConstraint: { type: 'string' }, expectedRevision: { type: 'number' } }, required: ['logicBlockId'] },
+      execute: (args) => runtime.updateLogicBlock(sessionId, args.logicBlockId, args),
+    },
+    {
+      name: 'wb_permanently_delete_archived_project',
+      description: '永久删除一个已归档项目。必须由用户明确确认，并输入完全匹配的项目名称；该操作不可恢复。',
+      parameters: {
+        type: 'object',
+        properties: { projectId: { type: 'string' }, projectNameConfirmation: { type: 'string', description: '用户输入的完整项目名称' }, userConfirmed: { type: 'boolean' } },
+        required: ['projectId', 'projectNameConfirmation', 'userConfirmed'],
+      },
+      execute: (args) => runtime.permanentlyDeleteArchivedProject(args.projectId, { ...args, actor: 'user' }),
     },
     {
       name: 'wb_bind_project',
@@ -146,6 +225,7 @@ function buildToolDefs(runtime, sessionId) {
               required: ['markdown'],
             },
           },
+          expectedRevision: { type: 'number', description: '当前项目 revision；过期写入会被拒绝' },
         },
         required: ['blocks'],
       },
@@ -207,6 +287,28 @@ function buildToolDefs(runtime, sessionId) {
       execute: (args) => runtime.cancelRun(sessionId, args),
     },
 
+    // ─── 在线书目（候选默认不写入项目） ─────────────────────────────────────
+    {
+      name: 'wb_search_literature', description: '检索 OpenAlex/Crossref 开放书目元数据，仅返回候选，不下载全文也不写入项目。',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, yearFrom: { type: 'integer' }, yearTo: { type: 'integer' }, limit: { type: 'integer', minimum: 1, maximum: 30 }, providers: { type: 'array', items: { type: 'string' } } }, required: ['query'] },
+      execute: (args) => runtime.searchLiterature(sessionId, args),
+    },
+    {
+      name: 'wb_add_literature', description: '用户确认后将一个书目候选写入项目书目库；默认只保存元数据。',
+      parameters: { type: 'object', properties: { record: { type: 'object', additionalProperties: true }, userConfirmed: { type: 'boolean' } }, required: ['record', 'userConfirmed'] },
+      execute: (args) => runtime.addLiterature(sessionId, args),
+    },
+    { name: 'wb_list_literature', description: '列出已确认书目及其正文关联。', parameters: { type: 'object', properties: {}, required: [] }, execute: () => runtime.listLiterature(sessionId) },
+    {
+      name: 'wb_bind_literature', description: '将已确认书目关联到正文块；不替代原文证据绑定。',
+      parameters: { type: 'object', properties: { literatureId: { type: 'string' }, blockId: { type: 'string' }, note: { type: 'string' } }, required: ['literatureId', 'blockId'] }, execute: (args) => runtime.bindLiterature(sessionId, args),
+    },
+    { name: 'wb_get_literature_trace', description: '读取书目确认追踪，不返回原始检索文本。', parameters: { type: 'object', properties: {}, required: [] }, execute: () => runtime.getLiteratureTrace(sessionId) },
+    { name: 'wb_import_literature_fulltext', description: '用户确认后导入已确认书目的一份本地全文，并作为证据建立索引。', parameters: { type: 'object', properties: { literatureId: { type: 'string' }, filePath: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['literatureId', 'filePath', 'userConfirmed'] }, execute: (args) => runtime.importLiteratureFulltext(sessionId, args) },
+    { name: 'wb_download_literature_fulltext', description: '用户确认后从 HTTPS 地址下载已确认书目的全文并建立索引。', parameters: { type: 'object', properties: { literatureId: { type: 'string' }, url: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['literatureId', 'url', 'userConfirmed'] }, execute: (args) => runtime.downloadLiteratureFulltext(sessionId, args) },
+    { name: 'wb_request_code_semantic', description: '为已导入代码建立由 DSH 完成的可追溯语义说明请求，原代码不会被修改。', parameters: { type: 'object', properties: { materialId: { type: 'string' }, instruction: { type: 'string' } }, required: ['materialId'] }, execute: (args) => runtime.requestCodeSemanticInterpretation(sessionId, args) },
+    { name: 'wb_save_code_semantic', description: '保存经 DSH 生成的代码语义说明并与原代码双文本索引。', parameters: { type: 'object', properties: { materialId: { type: 'string' }, requestId: { type: 'string' }, semantic: { type: 'object', additionalProperties: true } }, required: ['materialId', 'requestId', 'semantic'] }, execute: (args) => runtime.saveCodeSemanticInterpretation(sessionId, args) },
+
     // ─── 模板 ─────────────────────────────────────────────────────────────
     {
       name: 'wb_list_templates',
@@ -230,6 +332,14 @@ function buildToolDefs(runtime, sessionId) {
       },
       execute: (args) => runtime.saveTemplate(sessionId, args),
     },
+    {
+      name: 'wb_import_template_file', description: '导入用户明确选择的模板文件；模板不会进入 RAG 或作为事实证据。',
+      parameters: { type: 'object', properties: { filePath: { type: 'string' }, name: { type: 'string' }, type: { type: 'string', enum: ['outline', 'body', 'both', 'format'] } }, required: ['filePath'] },
+      execute: (args) => runtime.importTemplateFile(sessionId, args.filePath, args),
+    },
+    { name: 'wb_get_template', description: '查看一个模板的提取内容、标题结构和警告。', parameters: { type: 'object', properties: { templateId: { type: 'string' } }, required: ['templateId'] }, execute: (args) => runtime.getTemplate(sessionId, args.templateId) },
+    { name: 'wb_preview_template_restructure', description: '根据模板生成不修改项目的差异预览；正文预览须由 DSH 提供 proposedBlocks。', parameters: { type: 'object', properties: { templateId: { type: 'string' }, kind: { type: 'string', enum: ['outline', 'body'] }, proposedBlocks: { type: 'array', items: { type: 'object', additionalProperties: true } } }, required: ['templateId'] }, execute: (args) => runtime.previewTemplateRestructure(sessionId, args) },
+    { name: 'wb_apply_template_restructure', description: '仅在用户明确确认后应用一个有效且未过期的模板差异预览。', parameters: { type: 'object', properties: { previewId: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['previewId', 'userConfirmed'] }, execute: (args) => runtime.applyTemplateRestructure(sessionId, args) },
 
     // ─── 重新生成 ─────────────────────────────────────────────────────────
     {
@@ -251,6 +361,21 @@ function buildToolDefs(runtime, sessionId) {
       description: '列出当前项目待处理的重新生成请求。LLM 应定期检查并处理这些请求。',
       parameters: { type: 'object', properties: {}, required: [] },
       execute: () => runtime.listPendingRegenerationRequests(sessionId),
+    },
+    {
+      name: 'wb_add_review_suggestion',
+      description: '在 review 阶段保存一条可定位的审查建议，供工作台展示；不会修改正文。',
+      parameters: {
+        type: 'object',
+        properties: {
+          suggestion: { type: 'string' },
+          category: { type: 'string' },
+          severity: { type: 'string', enum: ['info', 'warning', 'blocking'] },
+          blockId: { type: 'string' },
+        },
+        required: ['suggestion'],
+      },
+      execute: (args) => runtime.addReviewSuggestion(sessionId, args),
     },
 
     // ─── 插件系统 ─────────────────────────────────────────────────────────
@@ -290,28 +415,45 @@ function buildToolDefs(runtime, sessionId) {
     },
     {
       name: 'wb_generate_plugin_bundle',
-      description: '为新任务类型生成完整的插件包（6 个文件：package.json、README、framework.js、logic.js、evidence.js、index.js），写入本地目录。生成后告知用户运行安装命令。应先调用 wb_analyze_task_description 检测任务类型。',
+      description: '为新任务类型生成独立、可安装的工作台插件包。先询问用户是否使用默认目录 ~/.dsh/workbench-plugins/<taskType>-workbench 或指定自定义目录；得到明确确认后才能调用。生成完成后必须另行询问是否安装。',
       parameters: {
         type: 'object',
         properties: {
           taskType: { type: 'string', description: '任务类型标识符，如 contract、clinical-trial、bidding-doc' },
           name: { type: 'string', description: '插件显示名称，如"合同审查工作台"' },
           description: { type: 'string', description: '插件描述' },
-          outputDir: { type: 'string', description: '输出目录（默认 ./generated-plugins/<taskType>-workbench）' },
+          outputDir: { type: 'string', description: '输出目录（默认 ~/.dsh/workbench-plugins/<taskType>-workbench）' },
+          confirmedDestination: { type: 'boolean', description: '仅在用户已明确确认该输出目录后传 true' },
         },
-        required: ['taskType', 'name'],
+        required: ['taskType', 'name', 'confirmedDestination'],
       },
       execute: (args) => {
         return import('./generator.js').then(({ generatePluginBundle }) => generatePluginBundle(args))
+      },
+    },
+    {
+      name: 'wb_install_generated_plugin',
+      description: '将已验证的独立工作台插件安装到 DSH。生成完成后必须先询问用户是否立即安装；仅在得到明确同意后传 confirmedInstall=true。',
+      parameters: { type: 'object', properties: { outputDir: { type: 'string' }, profile: { type: 'string', description: 'DSH profile，默认 web' }, confirmedInstall: { type: 'boolean', description: '仅在用户明确同意安装后传 true' } }, required: ['outputDir', 'confirmedInstall'] },
+      execute: async (args) => {
+        if (args.confirmedInstall !== true) throw new Error('Installation requires explicit user confirmation.')
+        const { installGeneratedPlugin } = await import('./generator.js')
+        return installGeneratedPlugin(args)
       },
     },
 
     // ─── 工作台 UI ─────────────────────────────────────────────────────────
     {
       name: 'wb_open_workbench',
-      description: '确保工作台 HTTP 服务运行（端口 3199），并返回访问 URL。告知用户在浏览器中打开 http://127.0.0.1:3199。',
-      parameters: { type: 'object', properties: {}, required: [] },
-      execute: () => ({ url: 'http://127.0.0.1:3199', message: '工作台 UI 运行中，请在浏览器打开 http://127.0.0.1:3199' }),
+      description: '仅在用户明确要求时打开工作台。projectId 可选；省略时打开可创建、选择或绑定项目的首页，传入时先绑定该项目。宿主必须提供 openWorkbench 回调。',
+      parameters: { type: 'object', properties: { projectId: { type: 'string', description: '可选：要绑定并打开的已有项目 ID' } }, required: [] },
+      execute: async (args) => {
+        if (args?.projectId) await runtime.bindProject(sessionId, args.projectId)
+        if (typeof options.openWorkbench !== 'function') {
+          throw new Error('This host has no workbench UI launcher. Configure exposeTools({ openWorkbench }) or use the DSH plugin.')
+        }
+        return options.openWorkbench({ projectId: args?.projectId || null, sessionId })
+      },
     },
   ]
 }
@@ -464,7 +606,17 @@ export function exposeTools(runtime, options = {}) {
   const include = options.include || null
   const exclude = options.exclude || []
 
-  let defs = buildToolDefs(runtime, sessionId)
+  let defs = buildToolDefs(runtime, sessionId, options)
+
+  if (options.enforceStages !== false) {
+    defs = defs.map((definition) => ({
+      ...definition,
+      execute: async (args) => {
+        await assertToolAllowedForStage(runtime, sessionId, definition.name)
+        return definition.execute(args)
+      },
+    }))
+  }
 
   // 过滤
   if (include && Array.isArray(include)) {

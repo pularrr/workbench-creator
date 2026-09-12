@@ -1,5 +1,7 @@
 # readme_2 · workbench-core（可插拔文本处理工作台框架）
 
+> 架构更新：Agent 预设已迁移为同级独立项目 `../text-workbench-assistant/`。本目录只交付 DSH Core 插件；请以主 `README.md` 的安装和使用说明为准。
+
 > **一句话定位**：把论文工作台（`thesis-agent`）的核心架构抽象成一个**可插拔文本处理工作台框架**（v0.1.0）。通过三层插件系统（Framework / Logic / Evidence）+ 可选 Material 层，让同一套工作台运行时可快速迁移到论文、专利、法律合同、技术报告等多种结构化文本生成任务；并能让 LLM 一键生成全新任务类型的插件包。它是 thesis-agent 的 v2.0 演进——从「专用」走向「通用框架」。
 
 ---

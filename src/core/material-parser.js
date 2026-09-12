@@ -6,12 +6,18 @@
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
-const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.xml', '.html', '.htm', '.js', '.ts', '.py'])
+const CODE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.java', '.go', '.rs', '.c', '.cc', '.cpp', '.h', '.hpp', '.cs', '.php', '.rb', '.swift', '.kt', '.sql', '.sh', '.ps1'])
+const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.xml', '.html', '.htm', ...CODE_EXTENSIONS])
 const TYPE_BY_EXTENSION = {
   '.pdf': 'pdf', '.docx': 'docx', '.pptx': 'pptx', '.xlsx': 'xlsx',
   '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.webp': 'image', '.gif': 'image',
 }
 const MAX_TEXT_BYTES = 2 * 1024 * 1024
+
+export function isTextMaterialFile(filePath) {
+  const extension = path.extname(filePath).toLowerCase()
+  return TEXT_EXTENSIONS.has(extension)
+}
 
 export async function parseMaterialFile(filePath) {
   if (!filePath || typeof filePath !== 'string') throw new Error('filePath is required')
@@ -19,7 +25,7 @@ export async function parseMaterialFile(filePath) {
   const info = await stat(absolutePath)
   if (!info.isFile()) throw new Error('filePath must refer to a file')
   const extension = path.extname(absolutePath).toLowerCase()
-  const type = TEXT_EXTENSIONS.has(extension) ? 'text' : (TYPE_BY_EXTENSION[extension] || 'binary')
+  const type = CODE_EXTENSIONS.has(extension) ? 'code' : (TEXT_EXTENSIONS.has(extension) ? 'text' : (TYPE_BY_EXTENSION[extension] || 'binary'))
   const record = {
     name: path.basename(absolutePath), type, uri: absolutePath,
     metadata: { extension, sizeBytes: info.size, importedFrom: 'local-file' },
@@ -29,6 +35,7 @@ export async function parseMaterialFile(filePath) {
     const text = await readFile(absolutePath, 'utf8')
     record.extractedText = text
     record.metadata.characterCount = text.length
+    if (CODE_EXTENSIONS.has(extension)) record.metadata.codeLanguage = extension.slice(1)
   } else {
     record.metadata.extractionStatus = 'metadata_only'
     record.metadata.extractionHint = 'Install or provide a task Material plugin for rich parsing of this file type.'

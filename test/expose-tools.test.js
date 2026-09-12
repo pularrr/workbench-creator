@@ -171,7 +171,7 @@ test('exposeTools: LangChain format has func and schema', async () => {
   }
 
   // 调用 func
-  const result = await tools[0].func({})
+  const result = await tools.find((tool) => tool.name === 'wb_list_projects').func({})
   assert.ok(Array.isArray(result))
 
   console.log('  ✅ LangChain format: {name, description, schema, func}')
@@ -230,6 +230,31 @@ test('exposeTools: exclude blacklist filters tools', async () => {
   console.log('  ✅ exclude blacklist works')
 })
 
+test('exposeTools: opens a home page without a project or binds an explicit project', async () => {
+  const runtime = await makeRuntime()
+  const project = await runtime.createProject('ui-session', { name: 'UI 项目', taskType: 'thesis' })
+  const { execute } = exposeTools(runtime, {
+    platform: 'json',
+    sessionId: 'ui-session',
+    openWorkbench: ({ projectId, sessionId }) => ({ url: `http://127.0.0.1:3200/?sessionId=${sessionId}`, projectId }),
+  })
+  const home = await execute('wb_open_workbench', {})
+  assert.equal(home.projectId, null)
+  const result = await execute('wb_open_workbench', { projectId: project.id })
+  assert.equal(result.projectId, project.id)
+  assert.match(result.url, /sessionId=ui-session/)
+  console.log('  ✅ UI supports both home and bound-project modes')
+})
+
+test('generator requires explicit destination confirmation', async () => {
+  const { generatePluginBundle } = await import('../src/generator.js')
+  await assert.rejects(
+    () => generatePluginBundle({ taskType: 'confirmed-test', name: 'Confirmation Test' }),
+    /explicit user confirmation/
+  )
+  console.log('  ✅ generator rejects unconfirmed output destinations')
+})
+
 // ─── 端到端：用 exposeTools 跑完整流程 ──────────────────────────────────────
 
 test('exposeTools: end-to-end create project via OpenAI execute', async () => {
@@ -250,6 +275,10 @@ test('exposeTools: end-to-end create project via OpenAI execute', async () => {
   assert.ok(wb.project)
   assert.equal(wb.project.id, project.id)
   assert.ok(wb.outline && wb.outline.length >= 5, 'auto-generated outline should exist')
+
+  await execute({
+    function: { name: 'wb_set_work_stage', arguments: JSON.stringify({ stage: 'write', userConfirmed: true, reason: 'test confirmation' }) },
+  })
 
   // 3. 创建运行
   const run = await execute({

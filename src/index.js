@@ -6,7 +6,7 @@
  * structured text generation tasks via pluggable Framework/Logic/Evidence layers.
  *
  * Architecture:
- * - Core Runtime: state machine, storage, workbench server (3199), plugin loader
+ * - Core Runtime: state machine, storage, on-demand workbench server, plugin loader
  * - Built-in Plugins: thesis, patent
  * - Plugin Generator: LLM-driven creation of new task-type plugins
  */
@@ -16,9 +16,11 @@ import { WorkbenchStorage } from './core/storage.js'
 import { createWorkbenchServer } from './core/workbench-server.js'
 import { registerThesisPlugins } from './plugins/thesis/index.js'
 import { registerPatentPlugins } from './plugins/patent/index.js'
-import { analyzeTaskDescription, generatePluginBundle, verifyGeneratedPluginBundle } from './generator.js'
+import { analyzeTaskDescription, generatePluginBundle, verifyGeneratedPluginBundle, installGeneratedPlugin, getDefaultWorkbenchPluginRoot } from './generator.js'
 import { listSupportedTaskTypes, listPlugins, listPluginBundles, resolvePluginBundle } from './core/plugin-loader.js'
 import { createPluginSpecDraft, validatePluginSpec } from './core/plugin-spec.js'
+import { assertToolAllowedForStage, getAllowedTools, getWorkStageInfo, setWorkStage } from './work-stage.js'
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import os from 'node:os'
 
@@ -32,8 +34,8 @@ export function getWorkbenchSessionId(exec) {
 
 // ─── DSH tool bridge ───────────────────────────────────────────────────────
 // Expose the wb_* tool definitions declared on the plugin to the shared tool
-// registry (ctx.tools). Agent presets then grant a role subset through
-// ctx.tools.restrict (see the writer/reviewer/designer policies in apply).
+// registry (ctx.tools). The unified assistant policy exposes the complete
+// governed surface while stage guards enforce design/write/review boundaries.
 
 function toDshTool(def) {
   return {
@@ -50,8 +52,15 @@ function toDshTool(def) {
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
     },
     async execute(args, exec) {
-      const value = await def.execute(args, exec)
-      return JSON.parse(JSON.stringify({ ok: true, data: value === undefined ? null : value }))
+      await assertToolAllowedForStage(getRuntime(), getWorkbenchSessionId(exec), def.name)
+      try {
+        const value = await def.execute(args, exec)
+        await getRuntime().recordAgentTrace(getWorkbenchSessionId(exec), { kind: 'tool_success', label: def.name, detail: 'DSH 已完成此工具调用' })
+        return JSON.parse(JSON.stringify({ ok: true, data: value === undefined ? null : value }))
+      } catch (error) {
+        await getRuntime().recordAgentTrace(getWorkbenchSessionId(exec), { kind: 'tool_error', label: def.name, detail: error.message })
+        throw error
+      }
     },
   }
 }
@@ -75,24 +84,86 @@ function registerWorkbenchTools(ctx) {
   }
 }
 
+/**
+ * Bridge a durable page request back into the exact live DSH conversation.
+ * DSH's AgentRegistry owns the live agent; followup() appends a visible
+ * user-role message and wakes its next turn.  If the old conversation is not
+ * live we report that fact to Core instead of claiming a chat delivery.
+ */
+function createDshTaskNotifier(ctx) {
+  return async ({ sessionId, project, task }) => {
+    const agent = ctx?.agents?.get?.(sessionId)
+    if (!agent || typeof agent.followup !== 'function') {
+      return { delivered: false, reason: '对应 DSH 会话未处于活动状态，无法注入消息。' }
+    }
+    const text = [
+      `【工作台请求 #${task.id}】`,
+      `项目：${project.name}（${project.id}）`,
+      `类型：${task.type}`,
+      '请先调用 wb_claim_agent_task 领取该任务；随后按需调用检索/审查工具，周期性回写进度。',
+      '只能提交候选、结果或失败原因；不得绕过 ChangeSet 和用户确认直接改写正文。',
+    ].join('\n')
+    agent.followup({
+      id: `workbench-task-${randomUUID()}`,
+      role: 'user',
+      content: [{ type: 'text', text }],
+      source: { kind: 'plugin', plugin: 'dsh-workbench-core', form: 'notice', summary: `工作台任务 #${task.id}` },
+    })
+    return { delivered: true, reason: null }
+  }
+}
+
 // ─── Plugin State ──────────────────────────────────────────────────────────
 
 let runtime = null
 let server = null
+let serverStartup = null
+let pluginConfig = {}
+
+function configurePlugin(config = {}) {
+  if (runtime && config.storagePath && path.resolve(config.storagePath) !== runtime.storage.storagePath) {
+    throw new Error('storagePath cannot change after the shared workbench runtime has been initialized')
+  }
+  pluginConfig = { ...pluginConfig, ...config }
+}
 
 function getRuntime() {
   if (!runtime) {
-    const storagePath = path.join(os.homedir(), '.dsh', 'storages', 'workbench-core', 'state.json')
-    runtime = new WorkbenchRuntime({ storagePath })
+    // This is the single durable project store consumed by both DSH tools and
+    // the optional browser workbench. A host may point storagePath at its own
+    // shared persistent store location.
+    const storagePath = pluginConfig.storagePath || path.join(os.homedir(), '.dsh', 'storages', 'workbench-core', 'workbench.db')
+    runtime = new WorkbenchRuntime({ storagePath, retrieval: pluginConfig.retrieval, ocr: pluginConfig.ocr })
   }
   return runtime
 }
 
-function ensureServer(config = {}) {
-  if (!server) {
-    server = createWorkbenchServer(getRuntime(), { port: Number(config.workbenchPort) || 3200, fallback: true })
-  }
-  return server
+async function findExistingCoreService(port) {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(750) })
+    const health = response.ok ? await response.json() : null
+    return health?.service === 'workbench-core' ? { url: `http://127.0.0.1:${port}`, port, external: true } : null
+  } catch { return null }
+}
+
+async function ensureServer(config = {}) {
+  if (server) { await server.ready; return server }
+  if (serverStartup) return serverStartup
+  const port = Number(config.workbenchPort || pluginConfig.workbenchPort) || 3200
+  serverStartup = (async () => {
+    const existing = await findExistingCoreService(port)
+    if (existing) return existing
+    const local = createWorkbenchServer(getRuntime(), { port, fallback: false })
+    server = local
+    try {
+      await local.ready
+      return local
+    } catch (error) {
+      server = null
+      throw error
+    }
+  })()
+  try { return await serverStartup } finally { serverStartup = null }
 }
 
 // ─── DSH Plugin Definition ─────────────────────────────────────────────────
@@ -101,41 +172,62 @@ const plugin = {
   name: 'dsh-workbench-core',
   version: '0.1.0',
   description: 'Pluggable text-processing workbench framework. Supports thesis, patent, legal-contract, tech-report and other structured text generation tasks via Framework/Logic/Evidence plugin layers.',
-  inject: ['tools'],
+  inject: ['tools', 'agents'],
 
   // DSH/Cordis plugin contract. The loader invokes apply(ctx); keep
   // activate as a compatibility alias for hosts that use that convention.
   async apply(ctx, config = {}) {
-    if (config.mode === 'designer-policy') {
-      ctx.tools.restrict?.({ allow: ['wb_analyze_task_description', 'wb_create_plugin_spec_draft', 'wb_validate_plugin_spec', 'wb_generate_plugin_bundle', 'wb_verify_generated_plugin_bundle', 'wb_list_plugin_bundles', 'wb_list_task_types'] })
+    configurePlugin(config)
+    if (config.mode === 'assistant-policy') {
+      ctx.tools.restrict?.({ allow: [...new Set([...getAllowedTools('design'), ...getAllowedTools('write'), ...getAllowedTools('review')])] })
       return
     }
-    if (config.mode === 'writer-policy') {
-      ctx.tools.restrict?.({ allow: ['wb_list_projects', 'wb_create_project', 'wb_bind_project', 'wb_get_workbench', 'wb_set_outline', 'wb_set_manuscript', 'wb_set_domain_fields', 'wb_add_material', 'wb_import_material_file', 'wb_search_materials', 'wb_bind_evidence', 'wb_create_run', 'wb_get_run', 'wb_advance_run', 'wb_cancel_run', 'wb_save_template', 'wb_list_templates', 'wb_request_regeneration', 'wb_list_regeneration_requests', 'wb_create_snapshot', 'wb_compare_snapshot', 'wb_restore_snapshot', 'wb_export_document', 'wb_list_export_formats', 'wb_open_workbench'] })
-      return
-    }
-    if (config.mode === 'reviewer-policy') {
-      ctx.tools.restrict?.({ allow: ['wb_list_projects', 'wb_bind_project', 'wb_get_workbench', 'wb_search_materials', 'wb_bind_evidence', 'wb_compare_snapshot', 'wb_export_document', 'wb_list_export_formats'] })
-      return
-    }
-    // Expose the wb_* tools in the shared registry so agent presets can grant
-    // a role subset through ctx.tools.restrict (writer/reviewer/designer).
+    const notifier = createDshTaskNotifier(ctx)
+    getRuntime().setAgentTaskNotifier(notifier)
+    ctx.effect?.(() => () => {
+      // Do not retain an unloaded DSH Context. Standalone Core remains usable
+      // and will explicitly report that a message could not be injected.
+      getRuntime().setAgentTaskNotifier(null)
+    }, 'workbench-core: DSH task notifier')
+    // Expose the wb_* tools in the shared registry. The assistant-policy
+    // composition is installed independently by text-workbench-assistant.
     ctx.effect?.(() => registerWorkbenchTools(ctx), 'workbench-core: wb tools')
 
     // Register built-in plugins
     registerThesisPlugins()
     registerPatentPlugins()
 
-    // Start workbench server
-    ensureServer(config)
-
     ctx.logger.info('[workbench-core] Activated. Built-in task types:', listSupportedTaskTypes())
-    ctx.logger.info('[workbench-core] Workbench UI at configured port (automatic fallback enabled if busy)')
+    ctx.logger.info('[workbench-core] Builder/runtime activated. UI server remains stopped until wb_open_workbench is explicitly called.')
   },
 
   async activate(ctx) { return this.apply(ctx) },
 
   tools: [
+    {
+      name: 'wb_get_work_stage',
+      description: 'Get the unified text-workbench assistant stage and the tools currently allowed for this session.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: async (_args, exec) => getWorkStageInfo(getRuntime(), getWorkbenchSessionId(exec)),
+    },
+    {
+      name: 'wb_set_work_stage',
+      description: 'Switch between design, write, and review after the user requests or confirms the next stage. write and review require a bound project.',
+      parameters: {
+        type: 'object',
+        properties: {
+          stage: { type: 'string', enum: ['design', 'write', 'review'] },
+          reason: { type: 'string', description: 'Short user-facing reason for the transition' },
+          userConfirmed: { type: 'boolean', description: 'True only after the user explicitly confirms the transition.' },
+          assistantKey: { type: 'string', description: 'Stable profile and assistant key used for restart recovery.' },
+        },
+        required: ['stage', 'userConfirmed'],
+      },
+      execute: async (args, exec) => {
+        const sessionId = getWorkbenchSessionId(exec)
+        return setWorkStage(getRuntime(), sessionId, args.stage, { reason: args.reason, userConfirmed: args.userConfirmed, assistantKey: args.assistantKey })
+      },
+    },
     // ─── Project Management ───────────────────────────────────────────
     {
       name: 'wb_list_projects',
@@ -153,31 +245,93 @@ const plugin = {
           taskType: { type: 'string', description: `Task type. Supported: ${listSupportedTaskTypes().join(', ')}`, enum: listSupportedTaskTypes() },
           title: { type: 'string', description: 'Document title' },
           targetWords: { type: 'number', description: 'Target word count' },
+          degreeType: { type: 'string', enum: ['bachelor', 'master', 'doctor'], description: 'Degree type for thesis outline scaling; must match domainFields.degreeType when both are supplied.' },
+          patentType: { type: 'string', enum: ['invention', 'utility_model'], description: 'Patent type; must match domainFields.patentType when both are given.' },
+          domainFields: { type: 'object', additionalProperties: true, description: 'Task-specific fields. For a patent, domainFields.patentType is equivalent to patentType.' },
           metadata: { type: 'object', additionalProperties: true, description: 'Additional metadata' },
+          assistantKey: { type: 'string', description: 'Stable profile and assistant key used for restart recovery.' },
+          confirmedEviction: { type: 'boolean', description: 'Required when project creation would archive the oldest active project.' },
         },
         required: ['name', 'taskType'],
       },
       execute: async (args, exec) => getRuntime().createProject(getWorkbenchSessionId(exec), args),
     },
     {
+      name: 'wb_get_project_limit',
+      description: 'Get the ten-project active limit and the oldest project that would be archived when the limit is reached.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: async () => getRuntime().getProjectLimit(),
+    },
+    {
       name: 'wb_delete_project',
-      description: 'Delete a workbench project permanently. After deletion, tell the user the project was deleted and ask them to select or create another.',
+      description: 'Archive a workbench project after explicit user confirmation. The project leaves the active list but remains recoverable.',
       parameters: {
         type: 'object',
-        properties: { projectId: { type: 'string', description: 'Project ID to delete' } },
-        required: ['projectId'],
+        properties: { projectId: { type: 'string', description: 'Project ID to archive' }, userConfirmed: { type: 'boolean', description: 'True only after the user confirms removal from active projects.' } },
+        required: ['projectId', 'userConfirmed'],
       },
-      execute: async (args) => getRuntime().deleteProject(args.projectId),
+      execute: async (args) => {
+        if (args.userConfirmed !== true) throw new Error('Archiving a project requires explicit user confirmation')
+        return getRuntime().deleteProject(args.projectId)
+      },
+    },
+    {
+      name: 'wb_update_logic_block',
+      description: 'Update an editable writing-logic block for the current project.',
+      parameters: { type: 'object', properties: { logicBlockId: { type: 'string' }, purpose: { type: 'string' }, transition: { type: 'string' }, claim: { type: 'string' }, evidenceRequirement: { type: 'string' }, styleConstraint: { type: 'string' }, expectedRevision: { type: 'number' } }, required: ['logicBlockId'] },
+      execute: async (args, exec) => getRuntime().updateLogicBlock(getWorkbenchSessionId(exec), args.logicBlockId, args),
     },
     {
       name: 'wb_bind_project',
       description: 'Bind the current session to a project. Call this after creating or selecting a project.',
       parameters: {
         type: 'object',
-        properties: { projectId: { type: 'string', description: 'Project ID to bind' } },
+        properties: { projectId: { type: 'string', description: 'Project ID to bind' }, assistantKey: { type: 'string', description: 'Stable profile and assistant key used for restart recovery.' } },
         required: ['projectId'],
       },
-      execute: async (args, exec) => getRuntime().bindProject(getWorkbenchSessionId(exec), args.projectId),
+      execute: async (args, exec) => getRuntime().bindProject(getWorkbenchSessionId(exec), args.projectId, { assistantKey: args.assistantKey }),
+    },
+    {
+      name: 'wb_unbind_project',
+      description: 'Unbind this conversation from its project and return it to the design stage.',
+      parameters: { type: 'object', properties: { assistantKey: { type: 'string' } }, required: [] },
+      execute: async (args, exec) => getRuntime().unbindProject(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_get_resume_state',
+      description: 'Find a project previously associated with this session or a stable assistant key after DSH restarts.',
+      parameters: { type: 'object', properties: { assistantKey: { type: 'string' } }, required: ['assistantKey'] },
+      execute: async (args, exec) => getRuntime().getResumeState(getWorkbenchSessionId(exec), args.assistantKey),
+    },
+    {
+      name: 'wb_resume_project',
+      description: 'Resume a previous project after explicit user confirmation.',
+      parameters: { type: 'object', properties: { assistantKey: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['assistantKey', 'userConfirmed'] },
+      execute: async (args, exec) => {
+        if (args.userConfirmed !== true) throw new Error('Resuming a previous project requires explicit user confirmation')
+        return getRuntime().resumeProject(getWorkbenchSessionId(exec), args.assistantKey)
+      },
+    },
+    {
+      name: 'wb_list_archived_projects',
+      description: 'List projects archived manually or because the active project limit was reached.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: async () => getRuntime().listArchivedProjects(),
+    },
+    {
+      name: 'wb_restore_archived_project',
+      description: 'Restore an archived project after explicit user confirmation when capacity is available.',
+      parameters: { type: 'object', properties: { projectId: { type: 'string' }, assistantKey: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['projectId', 'userConfirmed'] },
+      execute: async (args, exec) => {
+        if (args.userConfirmed !== true) throw new Error('Restoring an archived project requires explicit user confirmation')
+        return getRuntime().restoreArchivedProject(args.projectId, { sessionId: getWorkbenchSessionId(exec), assistantKey: args.assistantKey })
+      },
+    },
+    {
+      name: 'wb_permanently_delete_archived_project',
+      description: 'Permanently delete an archived project after explicit confirmation and an exact project-name entry. This cannot be recovered.',
+      parameters: { type: 'object', properties: { projectId: { type: 'string' }, projectNameConfirmation: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['projectId', 'projectNameConfirmation', 'userConfirmed'] },
+      execute: async (args) => getRuntime().permanentlyDeleteArchivedProject(args.projectId, { ...args, actor: 'user' }),
     },
     {
       name: 'wb_get_workbench',
@@ -202,11 +356,14 @@ const plugin = {
     },
     {
       name: 'wb_set_manuscript',
-      description: 'Save manuscript blocks (ordered text blocks) for the bound project.',
+      description: 'Safely insert or update manuscript blocks for the bound project. This is the default for LLM chapter-by-chapter generation: blocks omitted from a call are retained. Identify an update with id or outlineNodeId. Set replaceAll=true only to replace the entire manuscript, and only after the user explicitly confirms userConfirmed=true.',
       parameters: {
         type: 'object',
         properties: {
-          blocks: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Manuscript blocks with markdown, outlineNodeId, logicBlockIds' },
+          blocks: { type: 'array', minItems: 1, items: { type: 'object', additionalProperties: true }, description: 'Manuscript blocks with markdown and stable id or outlineNodeId. Default behavior upserts these blocks and preserves all others.' },
+          expectedRevision: { type: 'number', description: 'Current project revision; stale writes are rejected.' },
+          replaceAll: { type: 'boolean', description: 'Dangerous whole-manuscript replacement. Requires userConfirmed=true.' },
+          userConfirmed: { type: 'boolean', description: 'Required only when replaceAll=true, after the user explicitly confirms replacement of the whole manuscript.' },
         },
         required: ['blocks'],
       },
@@ -226,15 +383,106 @@ const plugin = {
     },
     {
       name: 'wb_import_material_file',
-      description: 'Import one user-selected local material file into the bound project. Text formats are extracted up to 2 MB; PDF, Office and image files are recorded as metadata until a task Material plugin provides rich parsing. Never use this to scan directories.',
+      description: 'Import one user-selected local material file into the bound project. PDF, Office documents and images are parsed through the document/OCR service; text and code files are extracted directly.',
       parameters: { type: 'object', properties: { filePath: { type: 'string', description: 'Exact local file path selected by the user' } }, required: ['filePath'] },
       execute: async (args, exec) => getRuntime().importMaterialFile(getWorkbenchSessionId(exec), args.filePath),
     },
     {
+      name: 'wb_import_material_directory',
+      description: 'Import supported files from one explicitly user-selected directory into the bound project. This is intended for project creation. It processes files sequentially, returns imported/skipped/failed items, and never imports unless userConfirmed is true.',
+      parameters: { type: 'object', properties: { directoryPath: { type: 'string', description: 'Exact local directory selected by the user' }, recursive: { type: 'boolean', description: 'Whether to include subdirectories; defaults to true' }, maxFiles: { type: 'integer', minimum: 1, maximum: 500, description: 'Safety limit; defaults to 100' }, userConfirmed: { type: 'boolean', description: 'True only after the user confirms this exact directory import' } }, required: ['directoryPath', 'userConfirmed'] },
+      execute: async (args, exec) => getRuntime().importMaterialDirectory(getWorkbenchSessionId(exec), args.directoryPath, args),
+    },
+    {
       name: 'wb_search_materials',
-      description: 'Search extracted project material chunks using local hybrid keyword/vector retrieval.',
+      description: 'Search extracted project material chunks using keyword plus dense-vector RRF retrieval. Results include source location, component ranks, and any fallback state.',
       parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', minimum: 1, maximum: 30 } }, required: ['query'] },
       execute: async (args, exec) => getRuntime().searchMaterials(getWorkbenchSessionId(exec), args.query, args.limit),
+    },
+    {
+      name: 'wb_list_material_summaries',
+      description: 'List a paginated, lightweight material acceptance checklist. It returns name, type, page count, character count, extraction status, parser, warnings, sha256, role and indexed chunk count—never extractedText.',
+      parameters: { type: 'object', properties: { page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 100 }, keyword: { type: 'string' }, status: { type: 'string' } }, required: [] },
+      execute: async (args, exec) => getRuntime().listMaterialSummaries(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_list_material_chunks',
+      description: 'List a paginated, lightweight chunk index for one user-selected material. Each row only contains locator, character count and a short preview; use wb_get_material_content with chunkId for full chunk text.',
+      parameters: { type: 'object', properties: { materialId: { type: 'string' }, page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 30 } }, required: ['materialId'] },
+      execute: async (args, exec) => getRuntime().listMaterialChunks(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_get_material_content',
+      description: 'Read a bounded portion of one selected material or one selected indexed chunk. Requires materialId; text reads are capped at 20,000 characters and support offset/limit. Never use this to fetch every material at once.',
+      parameters: { type: 'object', properties: { materialId: { type: 'string' }, chunkId: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 20000 } }, required: ['materialId'] },
+      execute: async (args, exec) => getRuntime().getMaterialContent(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_get_retrieval_status',
+      description: 'Get the active retrieval provider, index version, chunk count, and fallback status for the bound project. No credential is returned.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: async (_args, exec) => getRuntime().getRetrievalStatus(getWorkbenchSessionId(exec)),
+    },
+    {
+      name: 'wb_list_embedding_profiles',
+      description: 'List administrator-preconfigured embedding profiles that a user may select. Returns model, dimensions, data boundary, and credential availability, never a credential.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: async () => getRuntime().listEmbeddingProfiles(),
+    },
+    {
+      name: 'wb_configure_retrieval',
+      description: 'Select one administrator-preconfigured embedding profile for the bound project. Explain the model and data boundary to the user first; userConfirmed must be true. Existing chunks are marked stale and must be reindexed separately.',
+      parameters: { type: 'object', properties: { profileId: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['profileId', 'userConfirmed'] },
+      execute: async (args, exec) => getRuntime().configureRetrieval(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_reindex_materials',
+      description: 'Rebuild the bound project material index with the configured embedding provider. This may send authorized extracted material text to the selected provider; use only after user confirmation.',
+      parameters: { type: 'object', properties: { userConfirmed: { type: 'boolean' } }, required: ['userConfirmed'] },
+      execute: async (args, exec) => {
+        if (args.userConfirmed !== true) throw new Error('Reindexing materials requires explicit user confirmation')
+        return getRuntime().reindexMaterials(getWorkbenchSessionId(exec))
+      },
+    },
+    {
+      name: 'wb_search_literature',
+      description: 'Understand and decompose the user intent first, then search OpenAlex/Crossref. Provide englishQuery, synonyms, domainTerms and year constraints when possible. Core deduplicates, scores and reranks candidates; this tool never writes project literature or downloads full text.',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, englishQuery: { type: 'string' }, synonyms: { type: 'array', items: { type: 'string' } }, intent: { type: 'object', properties: { queries: { type: 'array', items: { type: 'string' } }, synonyms: { type: 'array', items: { type: 'string' } }, domainTerms: { type: 'array', items: { type: 'string' } } }, additionalProperties: true }, domainTerms: { type: 'array', items: { type: 'string' } }, yearFrom: { type: 'integer' }, yearTo: { type: 'integer' }, limit: { type: 'integer', minimum: 1, maximum: 30 }, providers: { type: 'array', items: { type: 'string', enum: ['openalex', 'crossref'] } } }, required: ['query'] },
+      execute: async (args, exec) => getRuntime().searchLiterature(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_add_literature',
+      description: 'Add one user-selected literature metadata candidate to the project bibliography. Requires explicit confirmation and never imports full text.',
+      parameters: { type: 'object', properties: { record: { type: 'object', additionalProperties: true }, userConfirmed: { type: 'boolean' } }, required: ['record', 'userConfirmed'] },
+      execute: async (args, exec) => getRuntime().addLiterature(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_list_literature', description: 'List the confirmed project bibliography and its manuscript bindings.',
+      parameters: { type: 'object', properties: {}, required: [] }, execute: async (_args, exec) => getRuntime().listLiterature(getWorkbenchSessionId(exec)),
+    },
+    {
+      name: 'wb_bind_literature', description: 'Associate confirmed bibliographic metadata with a manuscript block. It does not replace a source-text evidence binding.',
+      parameters: { type: 'object', properties: { literatureId: { type: 'string' }, blockId: { type: 'string' }, note: { type: 'string' } }, required: ['literatureId', 'blockId'] }, execute: async (args, exec) => getRuntime().bindLiterature(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_get_literature_trace', description: 'Read bibliography confirmation trace without exposing private search query text.',
+      parameters: { type: 'object', properties: {}, required: [] }, execute: async (_args, exec) => getRuntime().getLiteratureTrace(getWorkbenchSessionId(exec)),
+    },
+    {
+      name: 'wb_import_literature_fulltext', description: 'Import a user-selected local full-text file for one confirmed literature record, then index that file as evidence.',
+      parameters: { type: 'object', properties: { literatureId: { type: 'string' }, filePath: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['literatureId', 'filePath', 'userConfirmed'] }, execute: async (args, exec) => getRuntime().importLiteratureFulltext(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_download_literature_fulltext', description: 'Download an HTTPS full-text URL only after the user explicitly confirms it, then import and index it for the selected confirmed literature record.',
+      parameters: { type: 'object', properties: { literatureId: { type: 'string' }, url: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['literatureId', 'url', 'userConfirmed'] }, execute: async (args, exec) => getRuntime().downloadLiteratureFulltext(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_request_code_semantic', description: 'Create a traceable DSH request to explain one imported code file without modifying its original text.',
+      parameters: { type: 'object', properties: { materialId: { type: 'string' }, instruction: { type: 'string' } }, required: ['materialId'] }, execute: async (args, exec) => getRuntime().requestCodeSemanticInterpretation(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_save_code_semantic', description: 'Save a schema-shaped code semantic explanation against unchanged original code, then reindex original and semantic text separately.',
+      parameters: { type: 'object', properties: { materialId: { type: 'string' }, requestId: { type: 'string' }, semantic: { type: 'object', additionalProperties: true }, lineStart: { type: 'integer' }, lineEnd: { type: 'integer' } }, required: ['materialId', 'requestId', 'semantic'] }, execute: async (args, exec) => getRuntime().saveCodeSemanticInterpretation(getWorkbenchSessionId(exec), args),
     },
     {
       name: 'wb_bind_evidence',
@@ -308,6 +556,8 @@ const plugin = {
           expectedRevision: { type: 'integer', description: 'Expected revision (from get_run)' },
           event: { type: 'string', description: 'Event name (use recommendedNextEvent from get_run)' },
           summary: { type: 'string', description: 'Step summary' },
+          idempotencyKey: { type: 'string', description: 'Stable key preventing a recovered step from being applied twice.' },
+          checkpoint: { type: 'object', additionalProperties: true, description: 'Durable recovery data saved with this completed step.' },
           observation: { type: 'object', additionalProperties: true, description: 'Observation data' },
         },
         required: ['runId', 'expectedRevision', 'event'],
@@ -351,6 +601,23 @@ const plugin = {
       },
       execute: async (args, exec) => getRuntime().saveTemplate(getWorkbenchSessionId(exec), args),
     },
+    {
+      name: 'wb_import_template_file', description: 'Import one user-selected Markdown, text, HTML, or DOCX template. Templates are stored separately and never enter RAG evidence retrieval.',
+      parameters: { type: 'object', properties: { filePath: { type: 'string' }, name: { type: 'string' }, type: { type: 'string', enum: ['outline', 'body', 'both', 'format'] } }, required: ['filePath'] },
+      execute: async (args, exec) => getRuntime().importTemplateFile(getWorkbenchSessionId(exec), args.filePath, args),
+    },
+    {
+      name: 'wb_get_template', description: 'Preview one stored template including extracted headings and warnings.',
+      parameters: { type: 'object', properties: { templateId: { type: 'string' } }, required: ['templateId'] }, execute: async (args, exec) => getRuntime().getTemplate(getWorkbenchSessionId(exec), args.templateId),
+    },
+    {
+      name: 'wb_preview_template_restructure', description: 'Create a non-mutating, framework-validated outline diff from one template. It never changes the project.',
+      parameters: { type: 'object', properties: { templateId: { type: 'string' }, kind: { type: 'string', enum: ['outline', 'body'] }, proposedBlocks: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Required for a body preview; DSH-proposed blocks should retain original IDs where possible.' } }, required: ['templateId'] }, execute: async (args, exec) => getRuntime().previewTemplateRestructure(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_apply_template_restructure', description: 'Apply one valid template diff only after explicit user confirmation; stale previews and invalid framework structures are refused.',
+      parameters: { type: 'object', properties: { previewId: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['previewId', 'userConfirmed'] }, execute: async (args, exec) => getRuntime().applyTemplateRestructure(getWorkbenchSessionId(exec), args),
+    },
 
     // ─── Regeneration ──────────────────────────────────────────────────
     {
@@ -372,6 +639,129 @@ const plugin = {
       description: 'List pending regeneration requests for the bound project.',
       parameters: { type: 'object', properties: {}, required: [] },
       execute: async (_args, exec) => getRuntime().listPendingRegenerationRequests(getWorkbenchSessionId(exec)),
+    },
+    {
+      name: 'wb_list_agent_tasks',
+      description: 'List durable AI tasks created from the workbench page. Use status=queued to find work waiting for DSH; task payload is scoped to the current project.',
+      parameters: { type: 'object', properties: { status: { type: 'string', enum: ['queued', 'claimed', 'running', 'candidate_ready', 'awaiting_user_confirmation', 'completed', 'failed'] } }, required: [] },
+      execute: async (args, exec) => getRuntime().listAgentTasks(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_list_collaboration_events',
+      description: 'List visible page/DSH collaboration events for the current project or session.',
+      parameters: { type: 'object', properties: { after: { type: 'string' }, limit: { type: 'integer' } }, required: [] },
+      execute: async (args, exec) => getRuntime().listCollaborationEvents({ ...args, sessionId: getWorkbenchSessionId(exec) }),
+    },
+    {
+      name: 'wb_register_agent_worker',
+      description: 'Register a real DSH Agent Worker and begin its visible heartbeat. Registration does not claim or execute AI tasks by itself.',
+      parameters: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, capabilities: { type: 'array', items: { type: 'string' } } }, required: ['name'] },
+      execute: async (args) => getRuntime().registerAgentWorker(args),
+    },
+    {
+      name: 'wb_heartbeat_agent_worker',
+      description: 'Update the heartbeat of a registered DSH Agent Worker. Use it periodically while the worker is actually alive.',
+      parameters: { type: 'object', properties: { workerId: { type: 'string' }, error: { type: 'string' } }, required: ['workerId'] },
+      execute: async (args) => getRuntime().heartbeatAgentWorker(args.workerId, args),
+    },
+    {
+      name: 'wb_stop_agent_worker',
+      description: 'Mark a DSH Agent Worker stopped and record an optional reason. It will no longer be shown as available.',
+      parameters: { type: 'object', properties: { workerId: { type: 'string' }, reason: { type: 'string' } }, required: ['workerId'] },
+      execute: async (args) => getRuntime().stopAgentWorker(args.workerId, args),
+    },
+    {
+      name: 'wb_list_agent_workers',
+      description: 'List registered DSH Agent Workers, heartbeat time, status, capabilities, and exception reason.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: async () => getRuntime().listAgentWorkers(),
+    },
+    {
+      name: 'wb_publish_collaboration_progress',
+      description: 'Publish a visible progress, tool summary, result, or error event for a page request.',
+      parameters: { type: 'object', properties: { taskId: { type: 'string' }, kind: { type: 'string' }, requestType: { type: 'string' }, visibleSummary: { type: 'string' }, payload: { type: 'object' } }, required: ['kind', 'visibleSummary'] },
+      execute: async (args, exec) => getRuntime().publishCollaborationEvent(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_list_audit_events',
+      description: 'List durable audit events for the bound project, including actor, action, revision range, trace ID, and timestamp.',
+      parameters: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 500 } }, required: [] },
+      execute: async (args, exec) => getRuntime().listAuditEvents(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_claim_agent_task',
+      description: 'Atomically claim one queued task for DSH execution. Claim before reading materials or calling an LLM so another executor cannot duplicate work.',
+      parameters: { type: 'object', properties: { taskId: { type: 'string' }, executor: { type: 'string' } }, required: ['taskId'] },
+      execute: async (args, exec) => getRuntime().claimAgentTask(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_dispatch_queued_agent_task',
+      description: 'Re-send an existing queued page task into the current live DSH conversation. Use after reopening a project from an old standalone workbench session.',
+      parameters: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
+      execute: async (args, exec) => getRuntime().dispatchQueuedAgentTask(getWorkbenchSessionId(exec), args.taskId),
+    },
+    {
+      name: 'wb_update_agent_task_progress',
+      description: 'Persist a progress checkpoint for a claimed task. Do not include secrets or full material text in the message.',
+      parameters: { type: 'object', properties: { taskId: { type: 'string' }, step: { type: 'string' }, message: { type: 'string' }, percent: { type: 'number', minimum: 5, maximum: 99 } }, required: ['taskId', 'step'] },
+      execute: async (args, exec) => getRuntime().updateAgentTaskProgress(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_complete_agent_task',
+      description: 'Complete a claimed task, or mark it as awaiting user confirmation if it produced a candidate. This never writes manuscript text itself.',
+      parameters: { type: 'object', properties: { taskId: { type: 'string' }, result: { type: 'object', additionalProperties: true }, message: { type: 'string' }, awaitingUserConfirmation: { type: 'boolean' } }, required: ['taskId'] },
+      execute: async (args, exec) => getRuntime().completeAgentTask(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_fail_agent_task',
+      description: 'Record a terminal task failure with a safe, user-actionable error summary.',
+      parameters: { type: 'object', properties: { taskId: { type: 'string' }, error: { type: 'string' } }, required: ['taskId', 'error'] },
+      execute: async (args, exec) => getRuntime().failAgentTask(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_submit_regeneration_candidate',
+      description: 'Store a DSH-generated regeneration candidate for the workbench Diff review. This never edits the manuscript. Use the pending request ID, proposed blocks, rationale, and evidence IDs; wait for the user to accept or reject blocks in the page.',
+      parameters: { type: 'object', properties: { requestId: { type: 'string' }, proposedBlocks: { type: 'array', items: { type: 'object', additionalProperties: true } }, summary: { type: 'string' }, rationale: { type: 'string' }, evidenceIds: { type: 'array', items: { type: 'string' } } }, required: ['requestId', 'proposedBlocks'] },
+      execute: async (args, exec) => getRuntime().submitRegenerationCandidate(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_resolve_regeneration_candidate',
+      description: 'Apply only the user-accepted blocks from a stored regeneration candidate. The user must have explicitly confirmed the exact selected blocks; rejected blocks remain unchanged.',
+      parameters: { type: 'object', properties: { candidateId: { type: 'string' }, acceptedBlockIds: { type: 'array', items: { type: 'string' } }, userConfirmed: { type: 'boolean' } }, required: ['candidateId', 'acceptedBlockIds', 'userConfirmed'] },
+      execute: async (args, exec) => getRuntime().resolveRegenerationCandidate(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_create_change_set',
+      description: 'Create a unified reviewable change set covering outline, writing logic, manuscript text, and review suggestions. It never changes the project until explicitly applied.',
+      parameters: { type: 'object', properties: { baseRevision: { type: 'integer' }, outlineChanges: { type: 'array', items: { type: 'object' } }, logicChanges: { type: 'array', items: { type: 'object' } }, manuscriptChanges: { type: 'array', items: { type: 'object' } }, reviewChanges: { type: 'array', items: { type: 'object' } }, evidenceRefs: { type: 'array', items: { type: 'string' } }, rationale: { type: 'string' }, taskId: { type: 'string' } }, required: [] },
+      execute: async (args, exec) => getRuntime().createChangeSet(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_get_change_set',
+      description: 'Read a unified change set and its four-dimensional Diff before confirmation.',
+      parameters: { type: 'object', properties: { changeSetId: { type: 'string' } }, required: ['changeSetId'] },
+      execute: async (args, exec) => getRuntime().getChangeSet(getWorkbenchSessionId(exec), args.changeSetId),
+    },
+    {
+      name: 'wb_apply_change_set',
+      description: 'Apply only explicitly selected items from a change set. Requires exact user confirmation and rejects stale revisions.',
+      parameters: { type: 'object', properties: { changeSetId: { type: 'string' }, selectedItemIds: { type: 'array', items: { type: 'string' } }, userConfirmed: { type: 'boolean' } }, required: ['changeSetId', 'selectedItemIds', 'userConfirmed'] },
+      execute: async (args, exec) => getRuntime().applyChangeSet(getWorkbenchSessionId(exec), args),
+    },
+    {
+      name: 'wb_add_review_suggestion',
+      description: 'Persist one concrete review finding from the review stage so the workbench can show it beside the document. This does not modify manuscript text.',
+      parameters: {
+        type: 'object',
+        properties: {
+          suggestion: { type: 'string', description: 'Concrete, actionable review finding' },
+          category: { type: 'string', description: 'For example: structure, evidence, citation, terminology' },
+          severity: { type: 'string', enum: ['info', 'warning', 'blocking'] },
+          blockId: { type: 'string', description: 'Related manuscript block ID when known' },
+        },
+        required: ['suggestion'],
+      },
+      execute: async (args, exec) => getRuntime().addReviewSuggestion(getWorkbenchSessionId(exec), args),
     },
 
     // ─── Plugin System ─────────────────────────────────────────────────
@@ -433,21 +823,22 @@ const plugin = {
     },
     {
       name: 'wb_generate_plugin_bundle',
-      description: 'Generate and verify an isolated installable plugin package under generated-plugins. It never writes into workbench-core. Use wb_analyze_task_description first, review plugin-spec.json with the user, then install the verified package.',
+      description: `Generate and verify an isolated installable workbench plugin package. Before calling this, ask the user whether to use the default directory (${getDefaultWorkbenchPluginRoot()}) or provide a custom directory, and obtain an explicit confirmation. This operation only generates; ask separately whether to install it.`,
       parameters: {
         type: 'object',
         properties: {
           taskType: { type: 'string', description: 'Task type identifier (e.g. "contract", "clinical-trial")' },
           name: { type: 'string', description: 'Plugin display name' },
           description: { type: 'string', description: 'Plugin description' },
-          outputRoot: { type: 'string', description: 'Parent directory for generated packages (default: ./generated-plugins)' },
+          outputRoot: { type: 'string', description: 'Parent directory for generated packages (default: ~/.dsh/workbench-plugins, outside this package)' },
           outputDir: { type: 'string', description: 'Child directory within outputRoot (default: <outputRoot>/<taskType>-workbench)' },
+          confirmedDestination: { type: 'boolean', description: 'Must be true only after the user explicitly confirms this output directory.' },
           materialTypes: { type: 'array', items: { type: 'string' }, description: 'Supported material types, e.g. pdf, docx, image' },
           spec: { type: 'object', additionalProperties: true, description: 'Validated Plugin Spec JSON. When supplied, it is the single source of truth for this generated package.' },
         },
-        required: ['taskType', 'name'],
+        required: ['taskType', 'name', 'confirmedDestination'],
       },
-      execute: async (args) => generatePluginBundle(args),
+      execute: async (args) => generatePluginBundle({ ...args, outputRoot: args.outputRoot || pluginConfig.generatedOutputRoot }),
     },
     {
       name: 'wb_verify_generated_plugin_bundle',
@@ -455,16 +846,36 @@ const plugin = {
       parameters: { type: 'object', properties: { outputDir: { type: 'string' } }, required: ['outputDir'] },
       execute: async (args) => verifyGeneratedPluginBundle(args.outputDir),
     },
+    {
+      name: 'wb_install_generated_plugin',
+      description: 'Install one previously generated and verified workbench plugin into DSH. Call this only after asking the user whether to install now and receiving an explicit yes. It runs `dsh plugin --profile <profile> add <outputDir>` and never installs an unverified package.',
+      parameters: { type: 'object', properties: { outputDir: { type: 'string', description: 'Verified generated plugin directory' }, profile: { type: 'string', description: 'DSH profile, defaults to web' }, confirmedInstall: { type: 'boolean', description: 'Must be true only after the user explicitly confirms installation.' } }, required: ['outputDir', 'confirmedInstall'] },
+      execute: async (args) => {
+        if (args.confirmedInstall !== true) throw new Error('Installation requires explicit user confirmation. Ask whether to install now before calling this tool.')
+        return installGeneratedPlugin(args)
+      },
+    },
 
     // ─── Workbench UI ───────────────────────────────────────────────────
     {
       name: 'wb_open_workbench',
-      description: 'Open the workbench UI in the browser. The workbench runs at http://127.0.0.1:3199. Tell the user to open this URL.',
-      parameters: { type: 'object', properties: {}, required: [] },
-      execute: async () => {
-        const active = ensureServer()
-        const url = active.url || `http://127.0.0.1:${active.port || 3200}`
-        return { url, message: `Workbench UI is running. Open ${url} in your browser.` }
+      description: 'Start and open the shared workbench UI after an explicit user request. Omit projectId to open the home page for project creation or selection; provide it to bind that project before opening.',
+      parameters: { type: 'object', properties: { projectId: { type: 'string', description: 'Optional existing project ID to bind before opening' }, assistantKey: { type: 'string', description: 'Stable profile and assistant key used for restart recovery.' } }, required: [] },
+      execute: async (args, exec) => {
+        const sessionId = getWorkbenchSessionId(exec)
+        const assistantKey = args.assistantKey || 'web:text-workbench-assistant-v0'
+        if (args.projectId) await getRuntime().bindProject(sessionId, args.projectId, { assistantKey, workspaceId: assistantKey, source: 'dsh-open-workbench' })
+        const active = await ensureServer()
+        const baseUrl = active.url || `http://127.0.0.1:${active.port || 3200}`
+        const url = `${baseUrl}/?sessionId=${encodeURIComponent(sessionId)}&assistantKey=${encodeURIComponent(assistantKey)}&workspaceId=${encodeURIComponent(assistantKey)}${args.projectId ? '' : '&home=1'}`
+        return {
+          url,
+          projectId: args.projectId || null,
+          mode: args.projectId ? 'project' : 'home',
+          message: args.projectId
+            ? `Workbench UI is running for the selected project. Open ${url} in your browser.`
+            : `Workbench home is running. Open ${url} to create, select, or bind a project.`,
+        }
       },
     },
   ],

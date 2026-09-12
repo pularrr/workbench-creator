@@ -49,6 +49,10 @@ export function createStateMachine(stateTable) {
   }
 
   function advance(run, input = {}) {
+    if (input.idempotencyKey) {
+      const completed = run.steps.find((step) => step.idempotencyKey === input.idempotencyKey)
+      if (completed) return run
+    }
     if (Number(input.expectedRevision) !== run.revision) {
       throw new Error(`Run revision conflict: expected ${input.expectedRevision}, current ${run.revision}`)
     }
@@ -63,7 +67,7 @@ export function createStateMachine(stateTable) {
     }
     if (run.budget.usedSteps >= run.budget.maxSteps) next = 'budget_exceeded'
     const timestamp = new Date().toISOString()
-    run.steps.push({ id: randomUUID(), index: run.steps.length, from: run.state, event, to: next, status: 'completed', summary: String(input.summary || ''), createdAt: timestamp })
+    run.steps.push({ id: randomUUID(), index: run.steps.length, from: run.state, event, to: next, status: 'completed', summary: String(input.summary || ''), idempotencyKey: input.idempotencyKey || null, checkpoint: input.checkpoint || null, createdAt: timestamp })
     if (input.observation) {
       run.observations.push({ id: randomUUID(), state: run.state, type: input.observation.type || event, result: input.observation.result || '', reasonCodes: input.observation.reasonCodes || [], createdAt: timestamp })
     }
@@ -72,6 +76,8 @@ export function createStateMachine(stateTable) {
     run.budget.usedSteps += 1
     run.revision += 1
     run.updatedAt = timestamp
+    run.heartbeatAt = timestamp
+    if (input.checkpoint) run.checkpoint = structuredClone(input.checkpoint)
     if (event === 'fail') run.error = { message: String(input.summary || 'Run step failed'), createdAt: timestamp }
     // Auto-skip configured stages
     const skipStages = run.skipStages || []
@@ -141,6 +147,8 @@ export function createStateMachine(stateTable) {
       observations: [],
       artifacts: [],
       error: null,
+      checkpoint: input.checkpoint || null,
+      heartbeatAt: timestamp,
       createdAt: timestamp,
       updatedAt: timestamp,
     }

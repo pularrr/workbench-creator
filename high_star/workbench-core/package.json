@@ -1,0 +1,65 @@
+{
+  "name": "dsh-workbench-core",
+  "version": "0.1.0",
+  "description": "Pluggable text-processing workbench framework for DSH. Abstracts the thesis-workbench architecture into reusable Framework/Logic/Evidence plugin layers, supporting thesis, patent, legal-contract, tech-report and other structured text generation tasks.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./core": "./src/core/index.js",
+    "./expose-tools": "./src/expose-tools.js",
+    "./plugin-thesis": "./src/plugins/thesis/index.js",
+    "./plugin-patent": "./src/plugins/patent/index.js"
+  },
+  "files": [
+    "src",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check client.js && node --check src/index.js && node --check src/work-stage.js && node --check src/core/runtime.js && node --check src/core/plugin-loader.js && node --check src/core/plugin-spec.js && node --check src/core/material-parser.js && node --check src/core/state-machine.js && node --check src/core/storage.js && node --check src/core/workbench-server.js && node --check src/services/document-service.js && node --check src/services/retrieval-service.js && node --check src/services/version-service.js && node --check src/services/export-service.js && node --check src/plugins/thesis/framework.js && node --check src/plugins/thesis/logic.js && node --check src/plugins/thesis/evidence.js && node --check src/plugins/thesis/material.js && node --check src/plugins/patent/framework.js && node --check src/plugins/patent/logic.js && node --check src/plugins/patent/evidence.js && node --check src/plugins/patent/material.js && node --check src/generator.js"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "workbench",
+    "plugin",
+    "thesis",
+    "patent",
+    "text-generation",
+    "governed-runtime"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "docx": "9.7.1",
+    "officeparser": "7.8.0",
+    "pdfjs-dist": "6.2.108"
+  },
+  "overrides": {
+    "pdfjs-dist": "6.2.108"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "0.1.1-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

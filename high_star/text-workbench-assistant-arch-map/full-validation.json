@@ -1,0 +1,20 @@
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "severity": "warning",
+      "code": "MULTI_CONCEPT_NODE",
+      "message": "节点\"快照与版本机制\"名称包含并列连词，可能把多个概念/方法放在一个节点中。应拆分为独立子节点，共享共性父节点。",
+      "entityId": "twa-snapshot-version"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "MULTI_CONCEPT_NODE",
+      "message": "节点\"快照与版本机制\"名称包含并列连词，可能把多个概念/方法放在一个节点中。应拆分为独立子节点，共享共性父节点。",
+      "entityId": "twa-snapshot-version"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile, realpath, readFile, access } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawn } from 'node:child_process'
 import { validatePluginManifest } from './core/plugin-loader.js'
 import { validatePluginSpec } from './core/plugin-spec.js'
@@ -26,9 +26,20 @@ export async function installGeneratedPlugin({ outputDir, profile = 'web' } = {}
   const root = path.resolve(outputDir)
   const verification = await verifyGeneratedPluginBundle(root)
   if (!verification.valid) throw new Error(`Refusing to install an invalid generated plugin: ${verification.issues.join('; ')}`)
-  const executable = process.platform === 'win32' ? 'dsh.cmd' : 'dsh'
+  // A generated plugin is linked from ~/.dsh/workbench-plugins. Node resolves
+  // imports from that real path rather than from the profile's node_modules,
+  // so bind the bridge to the already-installed Core package before activation.
+  const dshHome = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
+  const coreEntry = path.join(dshHome, 'profiles', profile, 'node_modules', 'dsh-workbench-core', 'src', 'core', 'index.js')
+  try { await access(coreEntry) } catch { throw new Error(`dsh-workbench-core must be installed in DSH profile "${profile}" before installing a generated workbench`) }
+  const bridge = `// Generated at installation time; do not edit.\nexport { registerPluginBundle, createPluginBundleFromSpec } from ${JSON.stringify(pathToFileURL(coreEntry).href)}\n`
+  await writeFile(path.join(root, 'src', 'core-bridge.js'), bridge, 'utf8')
+  const executable = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : 'dsh'
+  const commandArgs = process.platform === 'win32'
+    ? ['/d', '/s', '/c', `dsh.cmd plugin --profile ${profile} add "${root}"`]
+    : ['plugin', '--profile', profile, 'add', root]
   const result = await new Promise((resolve, reject) => {
-    const child = spawn(executable, ['plugin', '--profile', profile, 'add', root], { shell: false, windowsHide: true })
+    const child = spawn(executable, commandArgs, { shell: false, windowsHide: true })
     let stdout = ''
     let stderr = ''
     const maxOutput = 1024 * 1024
@@ -45,7 +56,7 @@ export async function installGeneratedPlugin({ outputDir, profile = 'web' } = {}
 /** Verify a generated package without importing or executing its plugin code. */
 export async function verifyGeneratedPluginBundle(outputDir) {
   const root = path.resolve(outputDir)
-  const requiredFiles = ['package.json', 'plugin.manifest.json', 'plugin-spec.json', 'cordis.patch.yml', 'src/index.js', 'src/framework.js', 'src/logic.js', 'src/evidence.js', 'src/material.js']
+  const requiredFiles = ['package.json', 'plugin.manifest.json', 'plugin-spec.json', 'cordis.patch.yml', 'src/index.js', 'src/core-bridge.js', 'src/framework.js', 'src/logic.js', 'src/evidence.js', 'src/material.js']
   const missing = []
   for (const file of requiredFiles) {
     try { await access(path.join(root, file)) } catch { missing.push(file) }
@@ -183,6 +194,10 @@ export async function generatePluginBundle(options = {}) {
   }
   await writeFile(path.join(outputDir, 'package.json'), JSON.stringify(pkg, null, 2), 'utf8')
 
+  // During ordinary local verification this uses the peer dependency. The
+  // installer rewrites it to the selected DSH profile's Core entry point.
+  await writeFile(path.join(outputDir, 'src', 'core-bridge.js'), `export { registerPluginBundle, createPluginBundleFromSpec } from 'dsh-workbench-core/core'\n`, 'utf8')
+
   const manifest = {
     id: `${taskType}-workbench`, taskType, name, version: '0.1.0', apiVersion: 2,
     entry: './src/index.js', description,
@@ -215,7 +230,7 @@ export async function generatePluginBundle(options = {}) {
   await writeFile(path.join(outputDir, 'plugin-spec.json'), JSON.stringify(pluginSpec, null, 2), 'utf8')
   await writeFile(path.join(outputDir, 'cordis.patch.yml'), `- insert:\n    - id: ${taskType}-workbench\n      name: dsh-${taskType}-workbench\n      config: {}\n`, 'utf8')
   await mkdir(path.join(outputDir, 'scripts'), { recursive: true })
-  await writeFile(path.join(outputDir, 'scripts', 'verify.mjs'), `import { readFile, access } from 'node:fs/promises'\nimport path from 'node:path'\nimport { fileURLToPath } from 'node:url'\nimport { validatePluginSpec } from 'dsh-workbench-core/core'\nconst root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\nconst required = ['package.json', 'plugin.manifest.json', 'plugin-spec.json', 'cordis.patch.yml', 'src/index.js', 'src/framework.js', 'src/logic.js', 'src/evidence.js', 'src/material.js']\nfor (const file of required) await access(path.join(root, file))\nconst manifest = JSON.parse(await readFile(path.join(root, 'plugin.manifest.json'), 'utf8'))\nconst spec = JSON.parse(await readFile(path.join(root, 'plugin-spec.json'), 'utf8'))\nif (manifest.apiVersion !== 2 || !manifest.id || !manifest.taskType || !manifest.entry) throw new Error('Invalid plugin manifest')\nconst validation = validatePluginSpec(spec); if (!validation.valid) throw new Error(validation.issues.join('; '))\nconsole.log('Plugin package verified:', manifest.id)\n`, 'utf8')
+  await writeFile(path.join(outputDir, 'scripts', 'verify.mjs'), `import { readFile, access } from 'node:fs/promises'\nimport path from 'node:path'\nimport { fileURLToPath } from 'node:url'\nimport { createPluginBundleFromSpec } from '../src/core-bridge.js'\nconst root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')\nconst required = ['package.json', 'plugin.manifest.json', 'plugin-spec.json', 'cordis.patch.yml', 'src/index.js', 'src/core-bridge.js', 'src/framework.js', 'src/logic.js', 'src/evidence.js', 'src/material.js']\nfor (const file of required) await access(path.join(root, file))\nconst manifest = JSON.parse(await readFile(path.join(root, 'plugin.manifest.json'), 'utf8'))\nconst spec = JSON.parse(await readFile(path.join(root, 'plugin-spec.json'), 'utf8'))\nif (manifest.apiVersion !== 2 || !manifest.id || !manifest.taskType || !manifest.entry) throw new Error('Invalid plugin manifest')\nif (!createPluginBundleFromSpec(spec).framework) throw new Error('Invalid plugin spec')\nconsole.log('Plugin package verified:', manifest.id)\n`, 'utf8')
 
   // Write framework plugin
   const frameworkCode = `/**
@@ -353,7 +368,7 @@ export const ${symbolName}Material = {
  *   4. Restart DSH
  */
 
-import { registerPluginBundle, createPluginBundleFromSpec } from 'dsh-workbench-core/core'
+import { registerPluginBundle, createPluginBundleFromSpec } from './core-bridge.js'
 import manifest from '../plugin.manifest.json' with { type: 'json' }
 import spec from '../plugin-spec.json' with { type: 'json' }
 
@@ -363,8 +378,10 @@ export function register${symbolName.charAt(0).toUpperCase() + symbolName.slice(
   return registerPluginBundle({ manifest, ...bundle })
 }
 
-// DSH calls apply() when it activates an installed package.
-export async function apply() { return register${symbolName.charAt(0).toUpperCase() + symbolName.slice(1)}Plugins() }
+// DSH calls apply() when it activates an installed package. Registration is
+// side-effectful; returning its registry value would be treated as a Cordis
+// effect and rejected by the loader.
+export async function apply() { register${symbolName.charAt(0).toUpperCase() + symbolName.slice(1)}Plugins() }
 
 export { bundle, spec }
 `
@@ -427,7 +444,7 @@ ${outputDir}/
     taskType,
     name,
     outputDir,
-    files: ['package.json', 'plugin.manifest.json', 'plugin-spec.json', 'cordis.patch.yml', 'README.md', 'scripts/verify.mjs', 'src/index.js', 'src/framework.js', 'src/logic.js', 'src/evidence.js', 'src/material.js'],
+    files: ['package.json', 'plugin.manifest.json', 'plugin-spec.json', 'cordis.patch.yml', 'README.md', 'scripts/verify.mjs', 'src/index.js', 'src/core-bridge.js', 'src/framework.js', 'src/logic.js', 'src/evidence.js', 'src/material.js'],
     scaffold,
     verification,
     installationGuide: `cd ${outputDir} && npm install && dsh plugin --profile web add . && 重启 DSH`,

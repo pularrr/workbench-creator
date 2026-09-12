@@ -8,8 +8,15 @@ import { thesisEvidence } from '../src/plugins/thesis/evidence.js'
 import { patentFramework } from '../src/plugins/patent/framework.js'
 import { patentLogic } from '../src/plugins/patent/logic.js'
 import { patentEvidence } from '../src/plugins/patent/evidence.js'
+import { registerThesisPlugins } from '../src/plugins/thesis/index.js'
 import { analyzeTaskDescription } from '../src/generator.js'
 import { createPluginBundleFromSpec, validatePluginSpec } from '../src/core/plugin-spec.js'
+import { acquireServiceLock } from '../src/core/service-lock.js'
+import { WorkbenchRuntime } from '../src/core/runtime.js'
+import { createWorkbenchServer } from '../src/core/workbench-server.js'
+import { mkdtemp, rm } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 
 test('state machine: create and advance through happy path', () => {
   const sm = createStateMachine(thesisFramework.stateTable)
@@ -23,6 +30,64 @@ test('state machine: create and advance through happy path', () => {
 
   const r2 = sm.advance(r1, { expectedRevision: 1, event: 'plan_ready', summary: 'plan ready' })
   assert.equal(r2.state, 'awaiting_plan_confirmation')
+})
+
+test('Core service lock rejects a second runtime and recovers after release', async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-lock-'))
+  const lockPath = path.join(tmpDir, 'workbench.db.server.lock')
+  try {
+    const first = acquireServiceLock(lockPath, { storagePath: 'test.db' })
+    assert.throws(() => acquireServiceLock(lockPath), (error) => error.code === 'WORKBENCH_CORE_ALREADY_RUNNING')
+    first.release()
+    const second = acquireServiceLock(lockPath, { storagePath: 'test.db' })
+    second.release()
+  } finally { await rm(tmpDir, { recursive: true, force: true }) }
+})
+
+test('Core service exposes health only after it is ready', async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-health-'))
+  const runtime = new WorkbenchRuntime({ storagePath: path.join(tmpDir, 'state.json') })
+  const server = createWorkbenchServer(runtime, { port: 0, singleInstance: false })
+  try {
+    await server.ready
+    const response = await fetch(`${server.url}/health`)
+    const health = await response.json()
+    assert.equal(response.status, 200)
+    assert.equal(health.status, 'ready')
+    assert.equal(health.service, 'workbench-core')
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+    runtime.close()
+    await rm(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('Core HTTP API exposes page-direct RAG and retrieval configuration operations', async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-page-api-'))
+  const runtime = new WorkbenchRuntime({ storagePath: path.join(tmpDir, 'state.json') })
+  const sessionId = 'page-direct-api'
+  const server = createWorkbenchServer(runtime, { port: 0, singleInstance: false })
+  try {
+    await server.ready
+    registerThesisPlugins()
+    const project = await runtime.createProject(sessionId, { name: '页面直连测试', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    await runtime.setWorkStage(sessionId, 'write', { userConfirmed: true })
+    const profilesResponse = await fetch(`${server.url}/api/retrieval/profiles`)
+    const profiles = await profilesResponse.json()
+    assert.ok(profilesResponse.ok)
+    assert.ok(profiles.length > 0)
+    const searchResponse = await fetch(`${server.url}/api/materials/search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, query: '不存在的材料' }) })
+    assert.deepEqual(await searchResponse.json(), [])
+    const configureResponse = await fetch(`${server.url}/api/retrieval/configure`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sessionId, profileId: profiles[0].id, userConfirmed: true }) })
+    const configured = await configureResponse.json()
+    assert.ok(configureResponse.ok)
+    assert.equal(configured.profile.id, profiles[0].id)
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+    runtime.close()
+    await rm(tmpDir, { recursive: true, force: true })
+  }
 })
 
 test('state machine: invalid event rejected with guidance', () => {
@@ -134,6 +199,15 @@ test('thesis framework: generateOutline returns valid structure', async () => {
   assert.ok(outline[0].targetWords > 0)
   assert.equal(typeof outline[0].expectedFigures, 'number')
   assert.equal(typeof outline[0].expectedTables, 'number')
+})
+
+test('thesis framework v2 includes complete academic structure and degree scaling', async () => {
+  const master = await thesisFramework.generateOutline({ targetWords: 32700, degreeType: 'master' })
+  const doctor = await thesisFramework.generateOutline({ targetWords: 32700, degreeType: 'doctor' })
+  const titles = master.map((node) => node.title)
+  for (const title of ['中文摘要', 'Abstract', '绪论', '实验方案与数据处理', '实验结果与分析', '参考文献']) assert.ok(titles.includes(title))
+  assert.ok(doctor.find((node) => node.id === 'ch3').targetWords > master.find((node) => node.id === 'ch3').targetWords)
+  assert.equal(master.find((node) => node.id === 'refs').targetWords, 0)
 })
 
 test('thesis framework: validateOutline catches empty outline', async () => {

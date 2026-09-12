@@ -1,4 +1,5 @@
 import type { GraphOperation, ProjectionDiff, ReviewFinding } from "./contracts";
+import type { CodeCitation } from "../codegraph/schema";
 
 export interface AgentObservationView {
   round: number;
@@ -28,6 +29,11 @@ export interface AgentInteractionResult {
   observations: readonly AgentObservationView[];
   candidate?: PendingChangeView;
   warning?: string;
+  /** Present only when the user explicitly enabled source interpretation. */
+  codeCitations?: readonly CodeCitation[];
+  codeLimitations?: readonly string[];
+  /** Durable rolling state for the next turn; not rendered as an answer. */
+  conversationSummary?: string;
 }
 
 export interface ConfirmChangeResult {

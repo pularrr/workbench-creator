@@ -18,8 +18,9 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test",
-    "check": "node --check client.js && node --check src/index.js && node --check src/work-stage.js && node --check src/core/runtime.js && node --check src/core/plugin-loader.js && node --check src/core/plugin-spec.js && node --check src/core/material-parser.js && node --check src/core/state-machine.js && node --check src/core/storage.js && node --check src/core/workbench-server.js && node --check src/services/document-service.js && node --check src/services/retrieval-service.js && node --check src/services/version-service.js && node --check src/services/export-service.js && node --check src/plugins/thesis/framework.js && node --check src/plugins/thesis/logic.js && node --check src/plugins/thesis/evidence.js && node --check src/plugins/thesis/material.js && node --check src/plugins/patent/framework.js && node --check src/plugins/patent/logic.js && node --check src/plugins/patent/evidence.js && node --check src/plugins/patent/material.js && node --check src/generator.js"
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "start:workbench": "node scripts/start-workbench.mjs",
+    "check": "node --check client.js && node --check src/index.js && node --check src/work-stage.js && node --check src/core/runtime.js && node --check src/core/plugin-loader.js && node --check src/core/plugin-spec.js && node --check src/core/material-parser.js && node --check src/core/state-machine.js && node --check src/core/storage.js && node --check src/core/workbench-server.js && node --check src/services/document-service.js && node --check src/services/ocr-service.js && node --check src/services/retrieval-service.js && node --check src/services/literature-service.js && node --check src/services/version-service.js && node --check src/services/export-service.js && node --check src/plugins/thesis/framework.js && node --check src/plugins/thesis/logic.js && node --check src/plugins/thesis/evidence.js && node --check src/plugins/thesis/material.js && node --check src/plugins/patent/framework.js && node --check src/plugins/patent/logic.js && node --check src/plugins/patent/evidence.js && node --check src/plugins/patent/material.js && node --check src/generator.js"
   },
   "keywords": [
     "dsh-plugin",

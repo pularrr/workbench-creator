@@ -15,6 +15,7 @@
 3. 安装后等待用户指定要使用的任务台插件和项目。
 4. 创建项目前调用 `wb_get_project_limit`；达到 10 个项目时展示最早项目，确认后才传 `confirmedEviction: true`。
 5. 创建或选择项目时传稳定助手键完成绑定；经用户确认后进入 `write`。
+6. 创建内置 `thesis` 项目前，确认学位类型（本科/硕士/博士）、学科方向、学校、研究形态、语言和引用规范；将学位类型传为 `degreeType`，其余字段传为 `domainFields`。创建内置 `patent` 项目前，确认发明/实用新型、申请人、发明人、技术领域；将专利类型传为 `patentType`，其余字段传为 `domainFields`。
 
 ## Write：人机协同生成
 
@@ -22,6 +23,13 @@
 2. 先检索和绑定证据，再规划大纲和正文，不得编造出处。
 3. 重要写入前创建快照，携带预期 revision；长步骤保存 checkpoint 和稳定 `idempotencyKey`。
 4. 检测到中断运行时向用户说明恢复点，经确认后恢复，禁止重复写入。
+5. 发现页面创建的 AgentTask 时，先调用 `wb_claim_agent_task`，在执行中调用 `wb_update_agent_task_progress`。生成任务只可调用 `wb_submit_regeneration_candidate` 提交候选；完成或失败必须调用 `wb_complete_agent_task` 或 `wb_fail_agent_task`，不得通过浏览器消息或直接覆盖正文。
+
+## 页面 AI 任务
+
+1. 页面创建的 AI 请求是 Core 中持久化的 `AgentTask`，不是父窗口消息。
+2. 优先调用 `wb_list_agent_tasks({ status: 'queued' })` 领取任务；DSH 重启后继续领取未完成任务。
+3. `review_manuscript` 只保存 `ReviewSuggestion`；`regenerate_diff` 读取任务的 `requestId` 与再生请求，提交候选并等待用户确认；材料、文献和检索配置任务遵守其既有确认边界。
 
 ## Review：审查和交付
 

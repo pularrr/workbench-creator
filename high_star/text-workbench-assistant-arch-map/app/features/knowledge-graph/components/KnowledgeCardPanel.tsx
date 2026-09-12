@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PendingChangeView } from "../../../core/agent/online-contracts";
+import type { CodeEntryLink } from "../../../core/codegraph/schema";
 import { getCardSectionDefinition } from "../../../core/knowledge/card-section-catalog";
 import type { CardBlock, KnowledgeCollectionKind, KnowledgeDataset, KnowledgeHistoryKind } from "../../../core/knowledge/schema";
 import { expandedKnowledgeDataset } from "../../../data/knowledge/initial-dataset";
@@ -31,6 +32,7 @@ export function KnowledgeCardPanel({ selectedId, onReveal, dataset = expandedKno
   const [draftBlocks, setDraftBlocks] = useState<CardBlock[]>([]);
   const [pending, setPending] = useState<PendingChangeView | null>(null);
   const [saveError, setSaveError] = useState("");
+  const [codeLinks, setCodeLinks] = useState<CodeEntryLink[]>([]);
   const nodes = useMemo(() => toLegacyKnowledgeNodes(dataset), [dataset]);
   const index = useMemo(() => layoutIndex ?? createLayoutIndex(nodes), [layoutIndex, nodes]);
   const selected = index.nodeMap.get(selectedId) ?? index.nodeMap.values().next().value!;
@@ -47,6 +49,16 @@ export function KnowledgeCardPanel({ selectedId, onReveal, dataset = expandedKno
     setPending(null);
     setSaveError("");
   }, [selected.id, rawCard, selected.summary]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCodeLinks([]);
+    fetch(`/api/codegraph/links?knowledgeNodeId=${encodeURIComponent(selected.id)}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : { links: [] })
+      .then((value: { links?: CodeEntryLink[] }) => { if (!controller.signal.aborted) setCodeLinks(value.links ?? []); })
+      .catch(() => { /* Source interpretation is optional; never break knowledge cards. */ });
+    return () => controller.abort();
+  }, [selected.id]);
 
   const pageSections = card?.sections
     .filter((section) => getCardSectionDefinition(section.type).collection === activePage)
@@ -108,6 +120,8 @@ export function KnowledgeCardPanel({ selectedId, onReveal, dataset = expandedKno
           {activePage === "history" ? <div className="history-page"><ol>{history.map((entry) => <li key={entry.id}><span>{historyLabels[entry.kind]}</span><b>{entry.summary}</b><time>{entry.occurredAt.startsWith("1970") ? `修订 ${entry.revision ?? 1}` : new Date(entry.occurredAt).toLocaleString("zh-CN", { hour12: false })}</time></li>)}</ol></div> : null}
         </div>
       </> : null}
+
+      {codeLinks.length > 0 ? <div className="code-link-card"><div className="section-label">关联实现</div><p>以下为独立源码解读分支提供的定位信息，不会改变当前知识节点的构建结果。</p><ul>{codeLinks.map((link) => <li key={link.id}><b>{link.relation}</b><code>{link.citation.path}{link.citation.symbol ? ` · ${link.citation.symbol}` : ""}</code><small>第 {link.citation.startLine}–{link.citation.endLine} 行 · {link.source}{link.stale ? " · 待复核" : ""}</small>{link.rationale ? <span>{link.rationale}</span> : null}</li>)}</ul></div> : null}
 
       <div className="path-card"><div className="section-label">知识链路</div><div className="breadcrumbs">{[...selectedAncestors].reverse().map((node) => <button key={node.id} onClick={() => onReveal(node.id)}>{node.title}<span>→</span></button>)}<b>{selected.title}</b></div></div>
       {selectedChildren.length > 0 ? <div className="detail-group"><div className="section-label">关联知识</div><div className="child-list">{selectedChildren.map((node) => <button key={node.id} onClick={() => onReveal(node.id)}><i style={{ background: branchMeta[node.branch].color }} /><span><b>{node.title}</b><small>{node.subtitle}</small></span><em>＋</em></button>)}</div></div> : null}

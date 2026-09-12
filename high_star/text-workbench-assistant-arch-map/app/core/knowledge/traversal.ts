@@ -22,6 +22,9 @@ const edgePriority: Record<EdgeType, number> = {
   AFFECTS: 7,
   MITIGATES: 7,
   EVALUATED_BY: 7,
+  CALLS: 5,
+  CALLED_BY: 5,
+  DEPENDS_ON: 5,
 };
 
 const byPlacement = (a: KnowledgeNode, b: KnowledgeNode) =>

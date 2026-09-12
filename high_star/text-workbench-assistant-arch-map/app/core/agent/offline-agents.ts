@@ -19,7 +19,7 @@ import { applyOperations, createProjectionDiff, deterministicId } from "./graph-
 const allowedEdgeTypes = new Set([
   "SIMILAR_TO", "ALTERNATIVE_TO", "PREREQUISITE_OF", "PART_OF", "INPUT_TO",
   "OUTPUT_OF", "USES_MODEL", "IMPLEMENTS", "DERIVED_FROM", "AFFECTS",
-  "MITIGATES", "EVALUATED_BY",
+  "MITIGATES", "EVALUATED_BY", "CALLS", "CALLED_BY", "DEPENDS_ON",
 ]);
 
 export type OfflineProposalFactory = (

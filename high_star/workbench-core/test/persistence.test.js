@@ -67,6 +67,21 @@ test('storage recovers from a valid backup instead of replacing corrupted data',
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test('SQLite-only storage imports a legacy state.json once and reloads from entity tables', async () => {
+  const { directory, storagePath, runtime } = await fixture()
+  try {
+    const project = await runtime.createProject('legacy-session', { name: 'Legacy JSON Project', taskType: 'thesis' })
+    await runtime.setManuscriptBlocks('legacy-session', { blocks: [{ id: 'legacy-block', markdown: '已迁移正文' }] })
+    const sqlitePath = path.join(directory, 'workbench.db')
+    const migrated = new WorkbenchRuntime({ storagePath: sqlitePath })
+    assert.equal((await migrated.getProject(project.id)).manuscriptBlocks[0].markdown, '已迁移正文')
+    migrated.close()
+    const reloaded = new WorkbenchRuntime({ storagePath: sqlitePath })
+    assert.equal((await reloaded.getProject(project.id)).name, 'Legacy JSON Project')
+    reloaded.close()
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test('run advancement is idempotent and keeps a durable checkpoint', async () => {
   const { directory, storagePath, runtime } = await fixture()
   try {

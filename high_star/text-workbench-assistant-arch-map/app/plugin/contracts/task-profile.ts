@@ -163,4 +163,7 @@ export const BASE_EDGE_TYPES: EdgeTypeDef[] = [
   { type: "AFFECTS", label: "影响", direction: "directed", description: "source 影响 target" },
   { type: "MITIGATES", label: "缓解", direction: "directed", description: "source 方法/算法缓解了 target 问题/现象" },
   { type: "EVALUATED_BY", label: "由...评估", direction: "directed", description: "source 由 target 指标/方法评估" },
+  { type: "CALLS", label: "调用", direction: "directed", description: "source 源码符号调用 target 源码符号" },
+  { type: "CALLED_BY", label: "被调用", direction: "directed", description: "source 源码符号被 target 源码符号调用" },
+  { type: "DEPENDS_ON", label: "依赖", direction: "directed", description: "source 模块或符号依赖 target" },
 ];

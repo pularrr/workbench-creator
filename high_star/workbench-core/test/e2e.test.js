@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
+import { DatabaseSync } from 'node:sqlite'
 import { Document, Packer, Paragraph } from 'docx'
 
 import { WorkbenchRuntime } from '../src/core/runtime.js'
@@ -14,10 +15,10 @@ import { generatePluginBundle, analyzeTaskDescription, verifyGeneratedPluginBund
 registerThesisPlugins()
 registerPatentPlugins()
 
-async function makeRuntime() {
+async function makeRuntime(options = {}) {
   const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-e2e-'))
   const storagePath = path.join(tmpDir, 'state.json')
-  const runtime = new WorkbenchRuntime({ storagePath })
+  const runtime = new WorkbenchRuntime({ storagePath, ...options })
   return { runtime, tmpDir }
 }
 
@@ -105,6 +106,19 @@ test('e2e: thesis project full lifecycle (create → bind → outline → run �
 
 // ─── End-to-End: Patent Project Full Lifecycle ─────────────────────────────
 
+test('e2e: built-in thesis v2 stores the selected degree profile', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('thesis-v2', { name: '博士论文', taskType: 'thesis', degreeType: 'doctor' })
+    assert.equal(project.outlineProfile.degreeType, 'doctor')
+    assert.equal(project.outlineProfile.generatorVersion, '2.0.0')
+    assert.ok(project.outline.some((node) => node.id === 'abstract-zh'))
+    await assert.rejects(() => runtime.createProject('thesis-v2', { name: '冲突论文', taskType: 'thesis', degreeType: 'doctor', domainFields: { degreeType: 'master' } }), /conflicts/)
+  } finally {
+    await cleanup(tmpDir)
+  }
+})
+
 test('e2e: patent project full lifecycle (different state machine, different outline)', async () => {
   const { runtime, tmpDir } = await makeRuntime()
   const sessionId = 'test-session-patent'
@@ -153,6 +167,18 @@ test('e2e: patent project full lifecycle (different state machine, different out
   } finally {
     await cleanup(tmpDir)
   }
+})
+
+test('e2e: patent type controls the initial outline and survives reload', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const utility = await runtime.createProject('patent-type', { name: '实用新型', taskType: 'patent', patentType: 'utility_model' })
+    const invention = await runtime.createProject('patent-type', { name: '发明', taskType: 'patent', patentType: 'invention' })
+    assert.equal(utility.domainFields.patentType, 'utility_model')
+    assert.equal(utility.outlineProfile.patentType, 'utility_model')
+    assert.equal(utility.outline[0].targetWords, Math.round(invention.outline[0].targetWords * 0.7))
+    await assert.rejects(() => runtime.createProject('patent-type', { name: '冲突', taskType: 'patent', patentType: 'invention', domainFields: { patentType: 'utility_model' } }), /conflicts/)
+  } finally { runtime?.close(); await cleanup(tmpDir) }
 })
 
 // ─── End-to-End: Templates and Regeneration ─────────────────────────────────
@@ -229,6 +255,233 @@ test('e2e: review agent findings persist for the workbench UI', async () => {
   }
 })
 
+test('e2e: regeneration candidate stays pending until selected blocks are confirmed', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  const sessionId = 'test-session-regeneration-candidate'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '候选 Diff 测试', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [
+      { id: 'one', markdown: '原始第一段' }, { id: 'two', markdown: '原始第二段' },
+    ] })
+    const request = await runtime.requestRegeneration(sessionId, { content: '草稿', instruction: '补足证据' })
+    const candidate = await runtime.submitRegenerationCandidate(sessionId, {
+      requestId: request.id,
+      proposedBlocks: [{ id: 'one', markdown: '候选第一段' }, { id: 'two', markdown: '候选第二段' }],
+      summary: '替换两段', rationale: '根据证据补足',
+    })
+    const pending = await runtime.getWorkbench(sessionId)
+    assert.equal(pending.regenerationCandidates.length, 1)
+    assert.equal(pending.manuscriptBlocks[0].markdown, '原始第一段')
+    const result = await runtime.resolveRegenerationCandidate(sessionId, { candidateId: candidate.id, acceptedBlockIds: ['one'], userConfirmed: true })
+    assert.equal(result.applied, 1)
+    const updated = await runtime.getWorkbench(sessionId)
+    assert.equal(updated.manuscriptBlocks[0].markdown, '候选第一段')
+    assert.equal(updated.manuscriptBlocks[1].markdown, '原始第二段')
+    assert.ok(updated.agentTrace.some((item) => item.kind === 'candidate_resolved'))
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: chunked manuscript writes preserve earlier chapters unless whole replacement is confirmed', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  const sessionId = 'test-session-safe-manuscript'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '分章写作保护测试', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [{ outlineNodeId: 'ch1', markdown: '第一章内容' }] })
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [{ outlineNodeId: 'ch2', markdown: '第二章内容' }] })
+    let workbench = await runtime.getWorkbench(sessionId)
+    assert.equal(workbench.manuscriptBlocks.length, 2)
+    assert.equal(workbench.manuscriptBlocks[0].markdown, '第一章内容')
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [{ outlineNodeId: 'ch1', markdown: '第一章修订' }] })
+    workbench = await runtime.getWorkbench(sessionId)
+    assert.equal(workbench.manuscriptBlocks.length, 2)
+    assert.equal(workbench.manuscriptBlocks[0].markdown, '第一章修订')
+    await assert.rejects(() => runtime.setManuscriptBlocks(sessionId, { blocks: [{ markdown: '覆盖文本' }], replaceAll: true }), /explicit user confirmation/)
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [{ markdown: '覆盖文本' }], replaceAll: true, userConfirmed: true })
+    workbench = await runtime.getWorkbench(sessionId)
+    assert.equal(workbench.manuscriptBlocks.length, 1)
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: workspace binding and durable AgentTask survive runtime restart', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  const sessionId = 'test-session-workspace'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '工作区任务测试', taskType: 'thesis', workspaceId: 'web:test' })
+    const workspace = await runtime.getWorkspace('web:test')
+    assert.equal(workspace.activeProjectId, project.id)
+    await runtime.bindProject('new-dsh-session', project.id, { assistantKey: 'web:stable-assistant' })
+    assert.equal((await runtime.getWorkspace('web:stable-assistant')).activeProjectId, project.id)
+    const task = await runtime.createAgentTask(sessionId, { type: 'review_manuscript', payload: { blockIds: [] } })
+    assert.equal(task.status, 'queued')
+    const collaborationEvents = await runtime.listCollaborationEvents({ sessionId })
+    assert.ok(collaborationEvents.some((event) => event.kind === 'user_request' && event.taskId === task.id))
+    await runtime.claimAgentTask(sessionId, { taskId: task.id })
+    await runtime.updateAgentTaskProgress(sessionId, { taskId: task.id, step: 'retrieving_evidence', percent: 30 })
+    const completed = await runtime.completeAgentTask(sessionId, { taskId: task.id, awaitingUserConfirmation: true, result: { suggestionCount: 2 } })
+    assert.equal(completed.status, 'awaiting_user_confirmation')
+    const restarted = new WorkbenchRuntime({ storagePath: path.join(tmpDir, 'state.json') })
+    const afterRestart = await restarted.getWorkspace('web:test')
+    assert.equal(afterRestart.activeProjectId, project.id)
+    assert.equal((await restarted.getWorkspace('web:stable-assistant')).activeProjectId, project.id)
+    await restarted.bindProject(sessionId, project.id)
+    assert.equal((await restarted.listAgentTasks(sessionId))[0].status, 'awaiting_user_confirmation')
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: a new DSH session preserves the prior stage when rebinding the same assistant project', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('original-session', { name: '阶段恢复项目', taskType: 'thesis' })
+    await runtime.bindProject('original-session', project.id, { assistantKey: 'stable-stage-assistant' })
+    await runtime.setWorkStage('original-session', 'write', { assistantKey: 'stable-stage-assistant', userConfirmed: true })
+    await runtime.bindProject('new-session', project.id, { assistantKey: 'stable-stage-assistant' })
+    assert.equal(await runtime.getWorkStage('new-session'), 'write')
+    assert.equal((await runtime.getResumeState('new-session', 'stable-stage-assistant')).stage, 'write')
+  } finally { runtime.close(); await cleanup(tmpDir) }
+})
+
+test('e2e: SQLite audit events and Core entity projections are queryable', async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-audit-'))
+  const storagePath = path.join(tmpDir, 'workbench.db')
+  const sessionId = 'test-session-audit'
+  let runtime
+  try {
+    runtime = new WorkbenchRuntime({ storagePath })
+    const project = await runtime.createProject(sessionId, { name: '审计测试', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [{ outlineNodeId: 'chapter-1', markdown: '第一章' }] })
+    const events = await runtime.listAuditEvents(sessionId)
+    assert.ok(events.some((event) => event.action === 'project-created' && event.projectId === project.id))
+    const manuscriptEvent = events.find((event) => event.action === 'project.updated')
+    assert.ok(manuscriptEvent)
+    assert.equal(manuscriptEvent.actor, 'system')
+    assert.equal(typeof manuscriptEvent.beforeRevision, 'number')
+    assert.equal(manuscriptEvent.afterRevision, manuscriptEvent.beforeRevision + 1)
+    assert.equal(typeof manuscriptEvent.timestamp, 'string')
+    const database = new DatabaseSync(storagePath)
+    try {
+      const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name)
+      assert.ok(!tables.includes('workbench_state'), 'new SQLite-only databases must not create a state snapshot table')
+      for (const table of ['workspaces', 'projects', 'materials', 'material_chunks', 'source_bindings', 'manuscript_blocks', 'manuscript_versions', 'review_suggestions', 'regeneration_candidates', 'agent_tasks', 'agent_traces', 'agent_workers', 'collaboration_events']) assert.ok(tables.includes(table), `missing ${table}`)
+      const storedProject = database.prepare('SELECT id, revision FROM projects WHERE id = ?').get(project.id)
+      assert.equal(storedProject.id, project.id)
+      assert.equal(storedProject.revision, 3)
+      const block = database.prepare('SELECT outline_node_id, block_order FROM manuscript_blocks WHERE project_id = ?').get(project.id)
+      assert.equal(block.outline_node_id, 'chapter-1')
+      assert.equal(block.block_order, 0)
+    } finally { database.close() }
+    runtime.close()
+    runtime = new WorkbenchRuntime({ storagePath })
+    const restored = await runtime.getProject(project.id)
+    assert.equal(restored.manuscriptBlocks[0].markdown, '第一章')
+  } finally { runtime?.close(); await cleanup(tmpDir) }
+})
+
+test('e2e: agent worker heartbeat is durable and becomes stale when it stops reporting', async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-worker-'))
+  const storagePath = path.join(tmpDir, 'workbench.db')
+  let runtime
+  try {
+    runtime = new WorkbenchRuntime({ storagePath })
+    const worker = await runtime.registerAgentWorker({ id: 'dsh-worker-1', name: 'DSH Worker', capabilities: ['claim_agent_task'] })
+    assert.equal(worker.status, 'online')
+    await runtime.heartbeatAgentWorker(worker.id)
+    assert.equal((await runtime.listAgentWorkers())[0].status, 'online')
+    runtime.close()
+    runtime = new WorkbenchRuntime({ storagePath })
+    assert.equal((await runtime.listAgentWorkers())[0].name, 'DSH Worker')
+    await runtime.stopAgentWorker(worker.id, { reason: 'normal shutdown' })
+    assert.equal((await runtime.listAgentWorkers())[0].status, 'stopped')
+  } finally { runtime?.close(); await cleanup(tmpDir) }
+})
+
+test('e2e: a page task reports real DSH conversation injection delivery', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('injection-session', { name: '会话注入', taskType: 'thesis' })
+    const calls = []
+    runtime.setAgentTaskNotifier(async (value) => { calls.push(value); return { delivered: true } })
+    const task = await runtime.createAgentTask('injection-session', { type: 'review_manuscript', requestedBy: 'page' })
+    assert.equal(task.delivery.delivered, true)
+    assert.equal(calls[0].sessionId, 'injection-session')
+    const events = await runtime.listCollaborationEvents({ sessionId: 'injection-session' })
+    assert.ok(events.some((event) => event.kind === 'chat_injected' && event.taskId === task.id))
+  } finally { runtime.close(); await cleanup(tmpDir) }
+})
+
+test('e2e: confirmed literature is deduplicated and can be bound without becoming RAG evidence', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('literature', { name: '书目', taskType: 'thesis' })
+    await runtime.bindProject('literature', project.id)
+    await runtime.setManuscriptBlocks('literature', { blocks: [{ id: 'background', markdown: '背景。' }] })
+    await assert.rejects(() => runtime.addLiterature('literature', { record: { title: 'A paper', doi: '10.1000/ABC' } }), /confirmation/)
+    const added = await runtime.addLiterature('literature', { userConfirmed: true, record: { title: 'A paper', doi: 'https://doi.org/10.1000/ABC', authors: [{ family: 'Li' }], year: 2025 } })
+    const duplicate = await runtime.addLiterature('literature', { userConfirmed: true, record: { title: 'Different title', doi: '10.1000/abc' } })
+    assert.equal(duplicate.duplicate, true)
+    const binding = await runtime.bindLiterature('literature', { literatureId: added.id, blockId: 'background', note: '背景引用' })
+    assert.equal(binding.blockId, 'background')
+    assert.equal((await runtime.listLiterature('literature')).length, 1)
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: a user-selected template is parsed separately from RAG materials', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('template-import', { name: '模板导入', taskType: 'thesis' })
+    await runtime.bindProject('template-import', project.id)
+    const filePath = path.join(tmpDir, 'outline-template.md')
+    await writeFile(filePath, '# 总体结构\n\n## 研究背景\n\n示例文本', 'utf8')
+    const template = await runtime.importTemplateFile('template-import', filePath, { type: 'outline' })
+    assert.equal(template.type, 'outline')
+    assert.equal(template.outlineSkeleton.length, 2)
+    assert.equal(template.outlineSkeleton[1].locator.startLine, 3)
+    assert.match(template.sourceSha256, /^[a-f0-9]{64}$/)
+    assert.equal((await runtime.getWorkbench('template-import')).materials.length, 0)
+    assert.equal((await runtime.getTemplate('template-import', template.id)).sourceFormat, 'text')
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: template restructure is previewed, validated, and only applied after confirmation', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('template-preview', { name: '模板重构', taskType: 'thesis' })
+    await runtime.bindProject('template-preview', project.id)
+    const filePath = path.join(tmpDir, 'restructure.md')
+    await writeFile(filePath, '# 绪论\n# 方法\n# 结论', 'utf8')
+    const template = await runtime.importTemplateFile('template-preview', filePath, { type: 'outline' })
+    const preview = await runtime.previewTemplateRestructure('template-preview', { templateId: template.id })
+    assert.equal(preview.status, 'ready_for_confirmation')
+    await assert.rejects(() => runtime.applyTemplateRestructure('template-preview', { previewId: preview.id, userConfirmed: false }), /explicit user confirmation/)
+    const applied = await runtime.applyTemplateRestructure('template-preview', { previewId: preview.id, userConfirmed: true })
+    assert.deepEqual(applied.outline.map((node) => node.title), ['绪论', '方法', '结论'])
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: confirmed literature full text and code semantics become traceable RAG materials', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  try {
+    const project = await runtime.createProject('fulltext-code', { name: '全文与代码', taskType: 'thesis' })
+    await runtime.bindProject('fulltext-code', project.id)
+    const literature = await runtime.addLiterature('fulltext-code', { userConfirmed: true, record: { title: 'Evidence paper', doi: '10.1000/fulltext' } })
+    const paperPath = path.join(tmpDir, 'paper.txt'); await writeFile(paperPath, '全文证据：雷达测量结果。', 'utf8')
+    await assert.rejects(() => runtime.importLiteratureFulltext('fulltext-code', { literatureId: literature.id, filePath: paperPath }), /explicit user confirmation/)
+    const imported = await runtime.importLiteratureFulltext('fulltext-code', { literatureId: literature.id, filePath: paperPath, userConfirmed: true })
+    assert.ok(imported.materialId)
+    assert.equal((await runtime.listLiterature('fulltext-code'))[0].fulltextMaterialId, imported.materialId)
+    const codePath = path.join(tmpDir, 'radar.py'); await writeFile(codePath, 'def measure(signal):\n    return signal * 2\n', 'utf8')
+    const code = await runtime.importMaterialFile('fulltext-code', codePath)
+    assert.equal(code.type, 'code')
+    const request = await runtime.requestCodeSemanticInterpretation('fulltext-code', { materialId: code.id })
+    const semantic = await runtime.saveCodeSemanticInterpretation('fulltext-code', { materialId: code.id, requestId: request.id, semantic: { summary: 'measure 将输入信号乘以二并返回。', responsibilities: ['信号变换'] } })
+    assert.equal(semantic.sourceLocator.path, 'radar.py')
+    const stored = await runtime.getProject(project.id)
+    assert.ok(stored.sourceChunks.some((chunk) => chunk.contentKind === 'code_semantic'))
+  } finally { await cleanup(tmpDir) }
+})
+
 test('e2e: import one user-selected local text material without directory scanning', async () => {
   const { runtime, tmpDir } = await makeRuntime()
   const sessionId = 'test-session-material-import'
@@ -245,7 +498,56 @@ test('e2e: import one user-selected local text material without directory scanni
     assert.match(material.metadata.sha256, /^[a-f0-9]{64}$/)
     await access(material.uri)
     const wb = await runtime.getWorkbench(sessionId)
-    assert.equal(wb.materials[0].metadata.importedFrom, 'local-file')
+    assert.equal(wb.materials[0].characterCount, material.extractedText.length)
+    assert.equal(Object.hasOwn(wb.materials[0], 'extractedText'), false)
+  } finally {
+    await cleanup(tmpDir)
+  }
+})
+
+test('e2e: material inspection is paginated and never leaks extracted text through workbench state', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  const sessionId = 'test-session-material-inspection'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '材料验收测试', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    for (const name of ['one.md', 'two.md', 'three.md']) {
+      const sourcePath = path.join(tmpDir, name)
+      await writeFile(sourcePath, `# ${name}\n用于验收的材料正文。`, 'utf8')
+      await runtime.importMaterialFile(sessionId, sourcePath)
+    }
+    const checklist = await runtime.listMaterialSummaries(sessionId, { page: 2, pageSize: 2 })
+    assert.equal(checklist.total, 3)
+    assert.equal(checklist.items.length, 1)
+    assert.ok(checklist.items[0].characterCount > 0)
+    assert.equal(Object.hasOwn(checklist.items[0], 'extractedText'), false)
+    const content = await runtime.getMaterialContent(sessionId, { materialId: checklist.items[0].id, limit: 8 })
+    assert.equal(content.content.length, 8)
+    assert.equal(content.hasMore, true)
+    const chunks = await runtime.listMaterialChunks(sessionId, { materialId: checklist.items[0].id })
+    assert.ok(chunks.total > 0)
+    const workbench = await runtime.getWorkbench(sessionId)
+    assert.equal(Object.hasOwn(workbench.materials[0], 'extractedText'), false)
+  } finally { await cleanup(tmpDir) }
+})
+
+test('e2e: confirmed directory import imports supported files and isolates failures', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  const sessionId = 'test-session-directory-import'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '批量材料导入测试', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    const materialRoot = path.join(tmpDir, 'materials')
+    const nested = path.join(materialRoot, 'nested')
+    await mkdir(nested, { recursive: true })
+    await writeFile(path.join(materialRoot, 'radar.txt'), '雷达水分检测资料。', 'utf8')
+    await writeFile(path.join(nested, 'notes.md'), '# 实验记录\n微波传感器。', 'utf8')
+    await writeFile(path.join(materialRoot, 'archive.zip'), 'not imported', 'utf8')
+    await assert.rejects(() => runtime.importMaterialDirectory(sessionId, materialRoot), /explicit user confirmation/)
+    const result = await runtime.importMaterialDirectory(sessionId, materialRoot, { userConfirmed: true, recursive: true, maxFiles: 10 })
+    assert.equal(result.imported.length, 2)
+    assert.ok(result.skipped.some((item) => item.filePath.endsWith('archive.zip') && item.reason === 'unsupported_file_type'))
+    assert.equal((await runtime.getWorkbench(sessionId)).materials.length, 2)
   } finally {
     await cleanup(tmpDir)
   }
@@ -260,6 +562,10 @@ test('e2e: generic retrieval, evidence binding, snapshot and export services', a
     const sourcePath = path.join(tmpDir, 'source.txt')
     await writeFile(sourcePath, '毫米波雷达可以用于烟草水分的非接触检测，并提供稳定测量结果。', 'utf8')
     await runtime.importMaterialFile(sessionId, sourcePath)
+    const retrievalStatus = await runtime.getRetrievalStatus(sessionId)
+    assert.equal(retrievalStatus.provider.provider, 'hash')
+    assert.equal(retrievalStatus.chunkCount, 1)
+    assert.equal(retrievalStatus.state, 'ready')
     await runtime.setManuscriptBlocks(sessionId, { blocks: [{ id: 'block-1', markdown: '本系统采用毫米波雷达完成水分检测。' }] })
     const results = await runtime.searchMaterials(sessionId, '毫米波雷达 水分检测')
     assert.ok(results.length > 0)
@@ -271,6 +577,36 @@ test('e2e: generic retrieval, evidence binding, snapshot and export services', a
     await runtime.restoreSnapshot(sessionId, snapshot.id)
     const exported = await runtime.exportDocument(sessionId, 'markdown')
     assert.ok(exported.content.includes('毫米波雷达完成水分检测'))
+  } finally {
+    await cleanup(tmpDir)
+  }
+})
+
+test('e2e: a user can select an administrator-defined embedding profile then explicitly reindex', async () => {
+  const { runtime, tmpDir } = await makeRuntime({
+    retrieval: {
+      profiles: {
+        'offline-256': { name: '离线 256 维', description: '管理员预置的本地 profile', embedding: { type: 'hash', dimensions: 256 } },
+      },
+    },
+  })
+  const sessionId = 'test-session-retrieval-profile'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '模型选择', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    const profiles = await runtime.listEmbeddingProfiles()
+    assert.ok(profiles.some((profile) => profile.id === 'offline-hash'))
+    assert.ok(profiles.some((profile) => profile.id === 'offline-256' && profile.credentialAvailable))
+    await assert.rejects(() => runtime.configureRetrieval(sessionId, { profileId: 'offline-256', userConfirmed: false }), /explicit user confirmation/)
+    const sourcePath = path.join(tmpDir, 'profile.txt')
+    await writeFile(sourcePath, '毫米波雷达测量水分。', 'utf8')
+    await runtime.importMaterialFile(sessionId, sourcePath)
+    const configured = await runtime.configureRetrieval(sessionId, { profileId: 'offline-256', userConfirmed: true })
+    assert.equal(configured.profile.id, 'offline-256')
+    assert.equal(configured.state, 'stale')
+    const rebuilt = await runtime.reindexMaterials(sessionId)
+    assert.equal(rebuilt.provider.dimensions, 256)
+    assert.equal(rebuilt.state, 'ready')
   } finally {
     await cleanup(tmpDir)
   }
@@ -437,4 +773,57 @@ test('e2e: delete project removes it from list', async () => {
   } finally {
     await cleanup(tmpDir)
   }
+})
+
+test('e2e: permanently delete requires an archived project and exact name confirmation', async () => {
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wb-permanent-delete-'))
+  const storagePath = path.join(tmpDir, 'workbench.db')
+  const runtime = new WorkbenchRuntime({ storagePath })
+  try {
+    const project = await runtime.createProject('permanent-delete', { name: '待永久删除项目', taskType: 'thesis' })
+    await runtime.setManuscriptBlocks('permanent-delete', { blocks: [{ id: 'p1', markdown: '待删除正文' }] })
+    await assert.rejects(
+      () => runtime.permanentlyDeleteArchivedProject(project.id, { userConfirmed: true, projectNameConfirmation: project.name }),
+      /Only an archived project/,
+    )
+    await runtime.deleteProject(project.id)
+    assert.equal((await runtime.listArchivedProjects()).length, 1)
+    await assert.rejects(
+      () => runtime.permanentlyDeleteArchivedProject(project.id, { userConfirmed: true, projectNameConfirmation: '错误名称' }),
+      /Project name confirmation does not match/,
+    )
+    const deleted = await runtime.permanentlyDeleteArchivedProject(project.id, { userConfirmed: true, projectNameConfirmation: project.name })
+    assert.equal(deleted.deleted, true)
+    assert.equal(deleted.deletedEntityCounts.manuscriptBlocks, 1)
+    assert.equal((await runtime.listArchivedProjects()).length, 0)
+    const audit = await runtime.storage.listAuditEvents(null)
+    assert.ok(audit.some((event) => event.action === 'project.permanently_deleted' && event.projectId === project.id))
+  } finally { runtime.close(); await cleanup(tmpDir) }
+})
+
+test('e2e: unified change set previews and applies selected four-dimensional diffs', async () => {
+  const { runtime, tmpDir } = await makeRuntime()
+  const sessionId = 'changeset-session'
+  try {
+    const project = await runtime.createProject(sessionId, { name: '统一变更集', taskType: 'thesis' })
+    await runtime.bindProject(sessionId, project.id)
+    await runtime.setOutline(sessionId, { outline: [{ id: 'o1', title: '原大纲', objective: '原目标', order: 0 }], confirmed: true })
+    await runtime.setManuscriptBlocks(sessionId, { blocks: [{ id: 'm1', markdown: '原始正文' }] })
+    const current = await runtime.getBoundProject(sessionId)
+    const changeSet = await runtime.createChangeSet(sessionId, {
+      baseRevision: current.revision,
+      outlineChanges: [{ id: 'o1', entityId: current.outline[0].id, before: current.outline[0], after: { title: '更新大纲' } }],
+      logicChanges: [{ id: 'l1', entityId: current.logicBlocks[0].id, before: current.logicBlocks[0], after: { claim: '更新论点' } }],
+      manuscriptChanges: [{ id: 'm1', entityId: 'm1', before: { markdown: '原始正文' }, after: { markdown: '更新正文' } }],
+      reviewChanges: [{ id: 'r1', entityId: 'r1', before: null, after: { suggestion: '补充证据', severity: 'warning' } }],
+    })
+    assert.equal(changeSet.status, 'awaiting_confirmation')
+    const result = await runtime.applyChangeSet(sessionId, { changeSetId: changeSet.id, selectedItemIds: ['m1', 'r1'], userConfirmed: true })
+    assert.equal(result.applied, 2)
+    const updated = await runtime.getBoundProject(sessionId)
+    assert.equal(updated.manuscriptBlocks[0].markdown, '更新正文')
+    assert.equal(updated.outline[0].title, current.outline[0].title)
+    assert.equal(updated.logicBlocks[0].claim, current.logicBlocks[0].claim)
+    assert.equal(updated.reviewSuggestions.at(-1).suggestion, '补充证据')
+  } finally { runtime.close(); await cleanup(tmpDir) }
 })

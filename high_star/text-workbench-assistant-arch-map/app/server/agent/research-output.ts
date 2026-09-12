@@ -107,15 +107,28 @@ export const RESEARCH_CONTRACT = `返回 JSON 对象：
 {"answer":"研究小结","coverageAssessment":"已覆盖与缺口","converged":false,"gaps":["仍需探索的问题"],"proposal":{"summary":"摘要","rationale":"理由","newNodes":[{"id":"稳定英文或拼音ID","canonicalName":"具体名称","shortFact":"一句话概述","nodeRole":"domain|category|entity","nodeType":"concept|method|algorithm|model|problem|parameter|metric|application|component|artifact|category","parentId":"已有或本批新父节点ID","blocks":[{"type":"definition","title":"基础定义与理论说明","text":"与节点类型相符的完整知识"}]}],"cardBlocks":[{"nodeId":"节点ID","type":"principle","title":"原理、机制与推导","text":"完整知识"}],"relations":[{"sourceId":"节点ID","targetId":"节点ID","type":"PREREQUISITE_OF","rationale":"方向和理由"}],"evidence":[{"title":"真实来源或模型领域知识","url":"仅在已核实时填写","note":"来源支持什么；未经外部检索明确标注模型知识待核验"}]}}。
 domain 是领域导航，category 是分类概括，entity 才是单一具体知识对象。definition 是基础定义与理论说明；按类型写定义、概念、方法基本思想、模型对象/变量、问题表现或组件职责。完整机制放 principle，条件放 assumptions，比较放 comparison，步骤放 procedure。按本次批次上限生成完整条目；没有足够新增知识时允许少量或零个节点。模型的 converged 只是建议，未完成主题必须留在 gaps。纯 JSON，不含思维过程；字符串内的换行及 LaTeX 反斜杠必须按 JSON 转义。不要假装查阅过未获得的网页。`;
 
-export async function requestResearch(provider: LlmProvider, instructions: string, messages: LlmMessage[], options: { tokens?: number; signal?: AbortSignal; onCall?: () => void; onDiagnostic?: (message: string) => void } = {}): Promise<{ document: ResearchDocument; response: LlmResponseResult }> {
+export type ResearchRequestPurpose = "research" | "ingest" | "summary" | "repair";
+
+export async function requestResearch(provider: LlmProvider, instructions: string, messages: LlmMessage[], options: {
+  tokens?: number; signal?: AbortSignal; onCall?: () => void; onDiagnostic?: (message: string) => void;
+  purpose?: ResearchRequestPurpose;
+} = {}): Promise<{ document: ResearchDocument; response: LlmResponseResult }> {
   let repair = "";
   let failure = "";
   const outputLimit = provider.limits?.maxOutputTokens ?? 16384;
   let outputBudget = Math.min(options.tokens ?? 8192, outputLimit);
+  let zeroTextTruncation = false;
   for (let attempt = 0; attempt < 3; attempt++) {
     options.signal?.throwIfAborted();
     options.onCall?.();
-    const batchInstructions = instructions + "\n" + RESEARCH_CONTRACT + "\n本批最多 " + (attempt ? 3 : 6) + " 个新节点、" + (attempt ? 4 : 8) + " 个独立卡片补充。优先完整输出，更多知识留在 gaps 中由下一轮继续；不要为凑数量建节点。每项正文控制在600字以内。";
+    const summaryLike = options.purpose === "summary" || options.purpose === "ingest";
+    const constrained = zeroTextTruncation || attempt > 0;
+    const maxNodes = constrained ? 1 : summaryLike ? 2 : 6;
+    const maxBlocks = constrained ? 2 : summaryLike ? 4 : 8;
+    const textLimit = constrained ? 320 : summaryLike ? 480 : 600;
+    const batchInstructions = instructions + "\n" + RESEARCH_CONTRACT
+      + `\n本批最多 ${maxNodes} 个新节点、${maxBlocks} 个独立卡片补充。优先完整输出，更多知识留在 gaps 中由下一轮继续；不要为凑数量建节点。每项正文控制在${textLimit}字以内。`
+      + (summaryLike ? "资料总结只提取与当前节点直接相关、可形成图谱变更的内容；先输出少量完整 JSON，再处理其余资料。" : "");
     const response = await provider.createResponse({
       instructions: batchInstructions,
       messages: fitResearchMessages(messages,batchInstructions,repair,provider.limits?.maxInputChars ?? 120000),
@@ -135,7 +148,11 @@ export async function requestResearch(provider: LlmProvider, instructions: strin
           options.onDiagnostic?.("输出达到上限，已保留 " + partial.newNodes.length + " 个完整节点、" + partial.cardBlocks.length + " 个完整卡片条目，继续下一批。");
           return {document,response};
         }
+        zeroTextTruncation ||= response.text.trim().length === 0;
         outputBudget = nextResearchBudget(outputBudget,outputLimit,true);
+        if (zeroTextTruncation) {
+          throw new Error("模型推理预算耗尽，尚未产生可解析 JSON：" + response.incompleteReason + "；输出token " + (response.usage?.outputTokens ?? "未知") + "；推理token " + (response.usage?.reasoningTokens ?? "未知") + "；下一次将缩小为1个节点和2张卡片，预算 " + outputBudget);
+        }
         throw new Error("输出被截断：" + response.incompleteReason + "；已生成文本 " + response.text.length + " 字符；输出token " + (response.usage?.outputTokens ?? "未知") + "；推理token " + (response.usage?.reasoningTokens ?? "未知") + "；下次预算 " + outputBudget);
       }
       const value = response.toolCalls.find((call) => call.arguments)?.arguments ?? parseObject(response.text);
@@ -143,7 +160,9 @@ export async function requestResearch(provider: LlmProvider, instructions: strin
     } catch (error) {
       failure = error instanceof Error ? error.message : "JSON 无法解析";
       options.onDiagnostic?.("结构校验未通过，正在修复返回格式（" + (attempt + 1) + "/3）：" + failure.slice(0, 160));
-      repair = "上次输出未通过格式校验：" + failure.slice(0, 1500) + "\n修复 JSON 转义与字段类型。只输出本次能完整容纳的1–2个节点，剩余主题写入gaps待后续批次继续，禁止声称研究全部完成。禁止新增无依据的事实。待修复输出：\n" + response.text.slice(0, 16000);
+      repair = zeroTextTruncation
+        ? "上次调用的推理预算已耗尽，未返回任何可用 JSON。不要复述资料，不要展开长推理；只选择当前节点最重要的一项可验证补充，输出严格符合契约的最小 JSON，最多1个节点和2张卡片。其余内容写入 gaps。"
+        : "上次输出未通过格式校验：" + failure.slice(0, 1500) + "\n修复 JSON 转义与字段类型。只输出本次能完整容纳的1–2个节点，剩余主题写入gaps待后续批次继续，禁止声称研究全部完成。禁止新增无依据的事实。待修复输出：\n" + response.text.slice(0, 16000);
     }
   }
   throw new Error("模型返回格式经三次校验仍未通过：" + failure.slice(0, 600) + "。已保留此前完成的研究批次。");

@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     if (typeof body.sessionId !== "string" || !body.sessionId.trim() || typeof body.nodeId !== "string" || !body.nodeId.trim() || typeof body.query !== "string") throw new Error("任务参数无效");
     if (!["chat", "deep-search", "summary", "ingest"].includes(body.kind)) throw new Error("任务类型无效");
+    if (body.codeRepositoryId !== undefined && (typeof body.codeRepositoryId !== "string" || !body.codeRepositoryId.trim())) throw new Error("源码仓库参数无效");
     if (body.query.length > 80000 || (body.sourceText && (typeof body.sourceText !== "string" || body.sourceText.length > 100000))) throw new Error("请将资料拆分为较小的章节");
     return NextResponse.json({ job: await startAgentJob(body) }, { status: 202 });
   } catch (error) {

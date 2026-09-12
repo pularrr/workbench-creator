@@ -1,246 +1,302 @@
 # 文本生成工作台助手
 
-面向论文、专利、合同、技术报告等结构化文本任务的 DSH（DeepSeek Harness）协作预设。它把自然语言对话、可视化工作台与受控执行 Runtime 组合在一起：用户用自然语言说明目标和修改意图，系统在项目、材料、证据、版本和审查边界内完成任务。
+面向论文、专利和自定义技术报告等长文本任务的 DSH 协作预设。它将自然语言协作、领域工作台、材料检索、书目引用、版本审查和受控写入连成一条闭环：
 
-本仓库是 **Agent 预设层**，不保存项目数据，也不包含工作台 Runtime。它需要与同级的 `dsh-workbench-core` 插件一起安装：前者负责“怎样与用户协作”，后者负责“怎样可靠地执行和保存”。
+```text
+自然语言目标 → 选择内置任务台或审阅 Plugin Spec → 创建并绑定项目
+→ 导入授权材料 → 分块 / 检索 / 证据关联 → 候选正文
+→ 用户确认 → 审查、版本比较与导出
+```
 
-## 适用场景与主要功能
+本仓库是**自然语言预设层**，规定助手怎样确认、编排和恢复任务。项目、状态机、RAG、Web 操作台和领域插件运行在同级的 [`../workbench-core`](../workbench-core) DSH 插件中。
 
-适合需要多轮协作、可追溯依据和可恢复版本的文本工作，例如：
+## 本版更新
 
-- 学位论文：生成和校验章节大纲，按章节组织写作逻辑、文献证据和正文；
-- 专利申请：按技术领域、背景技术、发明内容、实施方式、权利要求书等结构推进；
-- 合同、技术报告或企业模板文本：先构建对应的领域任务台，再在其中完成撰写、审查和导出；
-- 已有文稿的局部重写、证据补充、结构审查和版本比对。
+相对旧版 README，本版按当前实现重新整理，新增或修订了：
 
-系统提供的能力包括：
+- 新建项目后可通过一次自然语言流程确认并**递归批量导入资料目录**；默认上限 100 个、最大 500 个文件，逐个返回导入/跳过/失败清单；
+- Office/PDF、文本/代码、HTML/EPUB 与图片 OCR 的材料接入；文件会复制到项目受控目录，并保留原路径、哈希和解析状态；
+- 离线 Hash 降级、可配置 OpenAI-compatible Embedding Profile、关键词 + 稠密向量 + RRF 混合检索；
+- OpenAlex/Crossref 在线书目检索、确认入库、可选 HTTPS 全文导入和正文书目关联；
+- 模板导入、重构差异预览、Framework 校验和确认应用；
+- Windows 下生成插件的 Core 依赖桥接、`dsh.cmd` 调用和 Cordis `apply()` 兼容修复；
+- 明确区分 Core 内置的论文/专利，与可生成、单独安装和重建的技术报告等领域插件。
 
-- `design / write / review` 三个明确工作阶段；
-- 任务台插件的 Spec 设计、校验、隔离生成和安装；
-- 项目创建、跨会话恢复、材料导入、检索与证据绑定；
-- 大纲、逻辑块、领域字段、正文、审查建议和模板管理；
-- 快照、版本差异、恢复、可中断运行记录和多格式导出；
-- 内置论文与专利领域能力，并支持扩展新的领域工作台。
+## 30 秒理解架构
 
-## 快速开始
+```text
+用户 / DSH 对话
+        │ 自然语言、确认、恢复
+        ▼
+文本生成工作台助手（本仓库）
+  Persona + Skill + design/write/review 编排
+        │ wb_* 工具
+        ▼
+dsh-workbench-core
+  Runtime：项目 / 状态机 / 存储 / RAG / 审计 / Web API
+        ├───────────────┬────────────────┬────────────────┐
+        ▼               ▼                ▼
+领域插件          材料与检索服务        本地工作台页面
+Framework/Logic/  解析/OCR/Embedding/   项目/材料/正文/
+Evidence/Material RRF/书目/模板          证据/版本/审查
+```
+
+| 类型 | 当前内容 | 升级方式 | 可单独卸载 |
+| --- | --- | --- | --- |
+| Core 内置领域能力 | `thesis`、`patent` | 更新 `workbench-core` | 否，随 Core 加载 |
+| 独立生成领域插件 | `thesis-pro`、`tech-report`、合同等 | 重新生成并安装 | 是 |
+| 自然语言预设 | 本仓库的“文本生成工作台助手” | 执行预设安装器 | 是 |
+
+生成插件默认保存于：
+
+```text
+~/.dsh/workbench-plugins/<taskType>-workbench/
+```
+
+它们不会写入 Core 或本仓库源码；生成目录确认和安装确认必须分开进行。
+
+## 安装与启动
 
 ### 前置条件
 
-- 已安装 DSH，并可使用 Web Profile；
 - Node.js `22.19.0` 或更高版本；
-- 本仓库与 `workbench-core` 位于同一父目录。典型目录如下：
+- 已安装 DSH，使用 Web Profile；
+- 本仓库与 `workbench-core` 位于同一父目录。
 
 ```text
-your-workspace/
+high_star/
 ├─ workbench-core/
 └─ text-workbench-assistant/
 ```
 
-Windows 下建议使用 `npm.cmd`。以下命令均在 PowerShell 中执行。
+Windows 建议使用 `npm.cmd`。
 
-### 第一次安装
+### 首次安装
 
-先安装并激活 Core 插件。它负责项目、数据、版本、证据、状态机和工作台页面。
+先安装 Core：
 
 ```powershell
-cd ..\workbench-core
+cd D:\雷达毕设相关\high_star\workbench-core
 npm.cmd ci
 dsh plugin --profile web add .
 ```
 
-再安装本项目的预设资产。该步骤会把 Persona、Skill 和预设配置复制到 DSH 的 `.dsh/.agent-presets/text-workbench-assistant-v0`，不会复制或覆盖 Core 源码。
+再安装预设：
 
 ```powershell
-cd ..\text-workbench-assistant
+cd D:\雷达毕设相关\high_star\text-workbench-assistant
 npm.cmd run setup
 ```
 
-重启 DSH，在预设列表中选择“文本生成工作台助手”。首次使用时可以直接输入：
-
-```text
-我想写一篇关于 FMCW 雷达水分检测的硕士论文。请先帮我建立论文任务台，给出可审阅的大纲和所需材料清单。
-```
-
-### 首次任务操作流程
-
-1. **描述目标**：说明文档类型、主题、交付要求、已有材料和限制条件。
-2. **设计任务台**：在 `design` 阶段审阅 Plugin Spec；生成目录确认与插件安装确认是两次独立确认。
-3. **选择项目**：指定已有项目或创建项目。系统会绑定当前对话与该项目；活跃项目达到 10 个时，会在获得确认后归档最早项目，而不是静默删除。
-4. **进入写作**：确认后切换到 `write`。只导入你明确授权的文件；先检索和绑定证据，再生成大纲或正文。
-5. **打开工作台**：说“打开工作台”，可在页面查看项目、材料、证据、正文、运行记录和版本。选中文本可要求 DSH 重写；点击审查可将请求发回当前 DSH 对话。
-6. **审查与交付**：要求“审查当前文稿”后进入 `review`。审查只写入可定位的建议，不会自动改正文；确认修改后回到 `write`，定稿后导出。
-
-如果退出 DSH，项目不会丢失。下次会话会识别上次绑定的项目与阶段，展示给你并在你确认后恢复。
-
-### 重装、更新与恢复
-
-| 情况 | 操作 | 项目数据影响 |
-| --- | --- | --- |
-| 仅更新预设内容 | 在本仓库执行 `npm.cmd run setup`，然后重启 DSH | 不影响项目数据 |
-| 更新 Core 源码或依赖 | 在 `workbench-core` 运行 `npm.cmd ci`，再执行 `dsh plugin --profile web add .` | 不影响项目数据 |
-| 重新安装整套能力 | 先按“第一次安装”顺序重新执行 Core 安装，再执行预设安装 | 不影响项目数据 |
-| 找回历史项目 | 在新会话中确认恢复，或在工作台的归档项目中恢复 | 项目归档是可恢复的 |
-
-默认项目状态保存于 Core 管理的 DSH 存储目录（通常为 `~/.dsh/storages/workbench-core/state.json`），其写入过程会维护备份文件。重装预设不会删除它；如果要迁移或清理数据，请先备份该状态文件。
-
-## 使用示例
-
-### 示例 1：建立论文工作台
-
-```text
-为“FMCW 雷达水分检测”建立硕士论文工作台。
-先给我审阅任务台规格和论文目录；不要生成正文。
-```
-
-确认规格后：
-
-```text
-使用这个论文任务台新建“雷达水分检测”项目，绑定当前对话。
-我确认后进入写作阶段。先根据我上传的材料检索证据，再起草第三章的方法部分。
-```
-
-### 示例 2：在工作台内进行局部重写
-
-1. 说“打开工作台”。
-2. 在正文中选中一段，点击“让 DSH 重写选中文本”。
-3. 输入“保持实验结论不变，压缩为学术表达，并补足与上一段的衔接”。
-
-页面会把该请求回传到当前 DSH 会话。Agent 基于当前项目、已授权材料和上下文生成候选改写，并通过受控写入保存新版本。
-
-### 示例 3：建立专利任务台并审查
-
-```text
-我要为一种毫米波雷达水分检测装置准备发明专利。请构建专利任务台，
-重点包含现有技术检索、专利性评估、说明书和权利要求书；先让我确认规格。
-```
-
-```text
-请审查当前项目的权利要求书：只给出清楚、可定位的风险和修改建议，
-不要直接改正文。
-```
-
-## 面向技术开发者
-
-### 总体架构：预设 + 插件 + 操作台
-
-```text
-用户 / DSH 对话
-        │
-        ▼
-文本生成工作台助手（本仓库）
-  Persona + Skill + 阶段编排策略
-        │ wb_* 工具
-        ▼
-dsh-workbench-core（DSH 插件）
-  Runtime：项目、会话、权限、状态机、存储、版本、审计
-        ├─────────────┬──────────────┐
-        ▼             ▼              ▼
-领域插件          服务层          工作台操作台
-Framework         材料解析        localhost HTTP UI
-Logic             混合检索        项目/正文/证据/版本
-Evidence          导出服务        反向提交 DSH 请求
-Material/Exporter JSON 存储
-```
-
-**本仓库（预设层）**由 `agent.cordis.yml`、`preset.yml` 与 `skills/text-workbench/SKILL.md` 组成。Persona 规定协作行为，Skill 规定阶段、确认和恢复协议；安装器仅将这些资产写入 DSH 预设目录。
-
-**Core 插件（执行层）**注册 `wb_*` 工具，持有共享 Runtime 和持久化存储。它不信任 Agent 的自然语言承诺：工具调用会经过阶段授权、参数约束、领域规则和 revision 检查后才会影响项目。
-
-**领域插件（可扩展层）**按 `taskType` 提供五类能力：Framework 定义结构和流程，Logic 定义段落/章节写作逻辑，Evidence 定义引文与证据评价，Material 归一化材料，Exporter 提供导出格式。论文和专利是内置样例；新领域由 Plugin Spec 生成到隔离目录后再安装。
-
-**操作台（交互层）**是 Core 按需启动的本地页面。它经 HTTP API 读取与更新同一 Runtime，并通过 `window.opener.postMessage` 把“重写选中内容”“请求审查”等意图回传给打开它的 DSH 会话。页面不保存模型密钥，也不直接调用模型。
-
-### 项目亮点与实现设计
-
-| 亮点 | 实现方式 | 带来的效果 |
-| --- | --- | --- |
-| 认知与治理分离 | Agent 负责理解、规划、生成与建议；Runtime 负责校验、存储、状态转移和审计 | 生成质量可迭代，关键操作仍然确定、可检查 |
-| 两层状态机 | 会话阶段机控制 `design / write / review` 的工具白名单；运行状态机推进单个生成任务 | 不会把“能否编辑正文”和“任务进行到哪一步”混为一谈 |
-| 领域流程可配置 | Framework 提供 `stateTable`、默认跳过阶段、大纲模式和字段 Schema；Core 用通用状态机解释 | 新增任务类型无需复制一套 Runtime |
-| 人在回路 | 目录、插件生成目录、插件安装、阶段切换、归档、正文应用等关键动作要求显式确认 | 避免模型擅自扩大范围或造成难以恢复的变更 |
-| 证据优先写作 | 先导入授权材料，进行分块与关键词/向量混合检索，再将证据绑定到内容 | 降低无依据生成，暴露证据缺口 |
-| 页面与对话协同 | 同一会话绑定、统一数据源、页面反向提交结构化提示 | 用户可在可视化界面定位内容，又保留对话式协作能力 |
-| 隔离式插件生成 | Plugin Spec 先校验，产物输出到独立工作台插件目录，验证后才允许安装 | 不污染 Core，也便于审阅和分发 |
-
-### 可配置状态机的实现
-
-这里存在两个彼此独立的状态模型。
-
-**1. 工作阶段状态机**
-
-`design → write → review` 是助手会话的治理阶段。`work-stage.js` 按阶段返回允许的 `wb_*` 工具集合；所有受控入口先检查该集合。`write` 和 `review` 必须已有绑定项目，且进入非 `design` 阶段必须有 `userConfirmed: true`。这将“生成插件”“写入正文”“仅审查”隔离开。
-
-**2. 运行状态机**
-
-每个生成任务都有独立的 run。例如论文流程可配置为：
-
-```text
-created → planning → awaiting_plan_confirmation → retrieving
-        → evaluating_evidence → drafting → validating → reviewing
-        → awaiting_user_decision → applying → completed
-```
-
-Framework 以声明式 `stateTable` 表达 `当前状态 + 事件 = 下一状态`。Core 的通用状态机负责：
-
-- 仅接受当前状态表中合法的事件；
-- 从表中计算 `recommendedNextEvent`，调用方无需猜测事件名；
-- 根据 `standard`、`full` 或 `skipStages` 自动跳过配置阶段；
-- 记录每步的状态迁移、摘要、观察、工件和 checkpoint；
-- 用步骤预算限制无限循环或异常长运行；
-- 支持暂停、恢复和取消。
-
-因此，“论文检索证据”和“专利检索现有技术”可以拥有不同状态表，却复用同一套执行、恢复和审计机制。
-
-### 可靠性设计
-
-- **显式授权**：只读取用户明确授权的材料；缺少来源时标记证据缺口，不伪造出处。
-- **阶段守卫**：阶段之外的工具调用在 Runtime 边界拒绝，不依赖模型自行遵守流程。
-- **乐观并发控制**：项目和运行记录维护 `revision`；写入携带 `expectedRevision` 时，旧操作会因冲突被拒绝，而不是覆盖新结果。
-- **幂等恢复**：长步骤携带稳定 `idempotencyKey`；相同键的已完成步骤重放时直接返回已有结果，避免中断后重复写入。
-- **检查点与心跳**：每步可保存 checkpoint，运行记录保存心跳和步骤历史，便于说明中断位置并由用户确认后恢复。
-- **快照与差异**：重要修改前可创建不可变快照；按文本块比较差异，必要时恢复历史版本。
-- **原子持久化和备份**：JSON 状态先写临时文件、保留备份后原子替换，减少进程中断导致的数据损坏。
-- **可恢复归档**：项目“删除”默认是归档而不是物理销毁；活跃项目上限为 10 个，触及上限时必须先确认归档对象。
-- **受限页面回传**：工作台仅面向本地地址服务，反向请求需要同一会话 ID；页面不持有模型凭据。
-
-### 技术栈与技术路线
-
-| 层次 | 技术选择 | 作用 |
-| --- | --- | --- |
-| 宿主与集成 | DSH、Cordis Patch、`@deepseek-ai/dsh` | 加载 Core 插件、预设与 Web 对话能力 |
-| 运行时 | Node.js `^22.19.0 \|\| >=24.0.0`、原生 ESM | Runtime、安装器和领域插件执行 |
-| 预设 | YAML Persona、文件系统 Skill | 约束对话行为、确认流程和阶段编排 |
-| 数据 | JSON、`node:fs/promises`、UUID | 项目、材料、会话、运行、快照和审计持久化 |
-| 业务校验 | JSON Schema、领域 Framework、revision | 参数、Plugin Spec、领域字段、并发和流程校验 |
-| 材料处理 | `officeparser`、`pdfjs-dist` | Office/PDF 文本提取 |
-| 检索 | 分块、192 维 hash embedding、关键词/向量混合检索 | 召回材料片段并绑定为证据 |
-| 版本 | 快照、块级 diff、恢复 | 审查改动和回滚 |
-| 导出 | Markdown/Text Core Exporter + 领域 Exporter Registry；`docx` 支持 | 发现并输出任务类型支持的格式 |
-| Web 操作台 | Node `http`、原生 HTML/CSS/JavaScript，默认本地 `3200` 端口 | 无额外前端构建链的项目工作台 |
-| 测试 | Node 内置 `node:test`、Runtime E2E | 核心逻辑、工具暴露、持久化、状态机和导出契约验证 |
-
-技术路线可以概括为：**自然语言意图 → 预设编排 → 受控工具调用 → Runtime 校验与持久化 → 页面展示/反向协作**。这使模型擅长的理解与生成能力，和系统擅长的规则、数据一致性与可恢复性各司其职。
-
-## 开发与验证
-
-本仓库的预设安装器与打包检查可通过以下命令验证：
+启动或重启 DSH Web：
 
 ```powershell
-npm.cmd test
+dsh web
+```
+
+选择“文本生成工作台助手”。DSH Web 通常使用 `3080`；通过“打开工作台”启动的项目操作台默认使用独立的本地 `3200` 端口。
+
+### 更新、卸载与恢复
+
+项目状态通常保存于：
+
+```text
+~/.dsh/storages/workbench-core/workbench.db
+```
+
+更新或卸载前先备份该文件。重装 Core 或预设不会主动清空项目数据。
+
+| 场景 | 操作 |
+| --- | --- |
+| 仅更新预设 | 本仓库执行 `npm.cmd run setup`，然后重启 DSH |
+| 更新 Core | Core 目录执行 `npm.cmd ci`，再执行 `dsh plugin --profile web add .` |
+| 卸载 Core | `dsh plugin --profile web remove dsh-workbench-core` |
+| 卸载生成插件 | `dsh plugin --profile web remove dsh-<taskType>-workbench`，再确认删除其生成目录 |
+| 卸载本预设 | 退出 DSH 后删除 `~/.dsh/.agent-presets/text-workbench-assistant-v0/` |
+| 恢复项目 | 新对话中确认恢复，或从归档项目恢复 |
+
+> 不要删除 `workbench.db` 或项目材料目录，除非已经备份且确认要永久清空全部项目。旧版 `state.json` 会在首次启动时一次性导入 SQLite，之后不再作为运行时主存储。
+
+## 第一次使用：创建项目并批量导入资料
+
+例如，使用资料目录：
+
+```text
+C:\Users\kuroko131\Desktop\微波水分测量\参考文献
+```
+
+在 DSH 输入：
+
+```text
+创建一个论文项目，题目为“基于微波与 FMCW 雷达的物料水分测量研究”。
+材料目录使用 C:\Users\kuroko131\Desktop\微波水分测量\参考文献，
+递归导入子目录，最多导入 100 个文件。
+请先复述导入范围，待我确认后创建项目、绑定当前对话并批量导入。
+```
+
+受控流程如下：
+
+1. 助手复述精确目录、递归范围和数量上限；
+2. 用户确认后创建并绑定项目，进入 `write`；
+3. 逐个复制、解析支持的文件；
+4. 返回 `imported / skipped / failed` 清单；
+5. 对可提取文本建立当前 Embedding Profile 的索引；
+6. 再检索、关联证据、生成大纲或正文。
+
+ZIP 和未知二进制文件会以 `unsupported_file_type` 跳过；损坏、过大或 OCR 失败的单个文件不会中断其余导入。
+
+### 材料格式与限制
+
+| 类别 | 常见格式 | 当前处理 |
+| --- | --- | --- |
+| Office / 文档 | PDF、DOCX、PPTX、XLSX、ODT、ODP、ODS、RTF、HTML、EPUB | OfficeParser 提取 Markdown；文本层为空时可尝试 OCR |
+| 图片 | PNG、JPG/JPEG、GIF、BMP、TIFF、WebP | 本地 OCR，默认 `chi_sim+eng`，记录完成/空结果/失败状态 |
+| 文本与代码 | TXT、MD、CSV、TSV、JSON、XML、常见代码文件 | 直接读取；代码保留原文，可额外请求 DSH 生成可追溯语义说明 |
+
+单个文档默认上限 50 MB；直接文本读取上限 2 MB。图片 OCR 是文本提取，不代表已经实现多模态图像向量检索。
+
+## RAG 与 Embedding
+
+```text
+授权材料 → 解析 / OCR → 带来源的文本分块
+→ Embedding 索引 + 关键词索引 → 稠密/关键词两路召回
+→ RRF 融合 → 片段、来源、定位 → 证据绑定或候选生成
+```
+
+默认是本地 192 维 Hash 向量：零密钥、零网络、零模型费用，但语义能力有限。管理员可预置语义 Embedding Profile；用户只能选择 Profile，项目和页面均不保存 API Key。
+
+内置中文语义 Profile：`dashscope-text-embedding-v4`，使用 `text-embedding-v4`、1024 维、OpenAI-compatible 协议。管理员配置：
+
+```powershell
+[Environment]::SetEnvironmentVariable('DASHSCOPE_API_KEY', '你的新密钥', 'User')
+[Environment]::SetEnvironmentVariable('DASHSCOPE_COMPATIBLE_BASE_URL', 'https://<你的地址>/compatible-mode/v1', 'User')
+```
+
+完全退出并重启 DSH 后，用户可说：
+
+```text
+列出可用 embedding 模型，并说明材料数据边界。
+为当前项目选择百炼中文语义检索模型 text-embedding-v4。我确认已授权材料文本可发送至该服务。
+我确认按此配置重建材料索引。
+```
+
+Profile 变更会将旧索引标为 `stale`，需要单独确认重建；远程模型不可用时会显示降级或失败状态，而不应伪称语义检索成功。
+
+## 在线文献扩充与引用
+
+在线书目通过自然语言触发，当前支持 OpenAlex 和 Crossref：
+
+```text
+检索 2020 年至今与“FMCW 雷达 微波 水分测量”相关的文献，
+使用 OpenAlex 和 Crossref，各返回最多 10 条；先只展示候选，不写入项目。
+```
+
+选择候选后：
+
+```text
+将第 1、3、5 条候选加入当前项目书目库。我确认只保存书目元数据，不下载全文。
+```
+
+可选全文流程：
+
+```text
+展示第 1 条的 HTTPS 全文链接和文件信息；我确认下载并导入该全文作为项目材料。
+```
+
+- 搜索结果不会自动写入项目；书目入库、全文下载和本地全文导入均需确认；
+- 书目绑定可关联正文块，但**不替代原文证据绑定**；
+- 仅导入的全文或用户明确授权的本地材料进入 RAG；
+- HTTPS 下载限制为 50 MB；用户需自行确认来源、许可和使用权，系统不会绕过付费墙或访问控制。
+
+## 模板导入与受控重构
+
+模板与事实材料隔离，不进入 RAG 证据库。支持 Markdown、TXT、HTML、DOCX：
+
+```text
+导入 C:\路径\论文模板.docx 作为当前项目模板；只用作结构和写作风格参考，不作为事实证据。
+基于该模板生成当前项目大纲的重构差异预览，但不要应用。
+```
+
+用户确认后才应用。Runtime 会校验领域 Framework；例如专利模板不能删除技术领域、背景技术、发明内容、具体实施方式和权利要求书等必需章节。预览过期或结构非法时会拒绝写入。
+
+## 工作流、版本与可靠性
+
+### 两类状态机
+
+`design → write → review` 是会话治理阶段：
+
+- `design`：分析需求、生成/验证/安装领域插件、选择或创建项目；
+- `write`：材料、检索、书目、模板、大纲、正文、快照和导出；
+- `review`：查看证据、版本和审查建议，不直接改写正文。
+
+每个领域任务还有独立运行状态机。Framework 用声明式 `stateTable` 定义“状态 + 事件 → 下一状态”；Core 返回合法事件与 `recommendedNextEvent`，支持跳步、预算上限、检查点与取消。
+
+### 保护机制
+
+- 显式确认：阶段转换、目录导入、插件生成/安装、书目、全文、模板、归档与恢复；
+- revision 乐观锁：旧写入不能静默覆盖新版本；
+- 幂等键与步骤预算：重试不重复推进，异常循环有上限；
+- 快照、块级 diff 与恢复；
+- SQLite WAL 事务、版本检查与可恢复备份；
+- 最多 10 个活跃项目，创建第 11 个前需确认归档最早项目；
+- Embedding 密钥仅由环境变量提供，项目 JSON 和页面不保存密钥。
+
+## 自定义技术报告等任务台
+
+```text
+为“微波水分测量技术报告”设计工作台。
+需要项目概述、技术原理、实验方案、结果分析、风险与局限、结论与建议；
+支持文献引用和 Markdown 导出。请先生成 Plugin Spec，不要生成或安装插件。
+```
+
+确认规格后，助手依次请求确认输出目录、生成并验证插件包、确认安装，再创建相应项目。
+
+| 契约 | 职责 |
+| --- | --- |
+| Framework | 文本结构、领域字段 Schema、大纲校验、状态表、UI 标签 |
+| Logic | 分块写作目标、衔接、风格维度、重写建议 |
+| Evidence | 引文格式、参考文献、证据充分性评价 |
+| Material | 支持类型、归一化、材料角色与分析建议 |
+
+Windows 安装时，生成器会为目标 DSH Profile 建立 Core 依赖桥接；不要手动复制 `dsh-workbench-core` 到生成插件目录。
+
+## 工作台页面
+
+说“打开工作台”即可打开当前绑定项目；没有绑定项目时打开首页。页面与 DSH 对话共享同一 Runtime 和持久化数据，可查看项目、材料、正文、证据、版本和运行记录。
+
+页面可发起“让 DSH 重写选中文本”或审查请求；它只向当前 DSH 会话回传结构化意图，不保存模型密钥，也不直接调用模型。
+
+## 面向开发者
+
+| 模块 | 位置 | 职责 |
+| --- | --- | --- |
+| 自然语言预设 | `agent.cordis.yml`、`skills/text-workbench/` | 确认协议、阶段编排、恢复、目录导入提示 |
+| Runtime | `../workbench-core/src/core/runtime.js` | 项目、材料、索引、书目、模板、版本、运行状态 |
+| 文档服务 | `../workbench-core/src/services/document-service.js` | Office/PDF 解析与 OCR 调度 |
+| 检索服务 | `../workbench-core/src/services/retrieval-service.js` | 分块、Embedding Provider、关键词/稠密召回与 RRF |
+| 书目服务 | `../workbench-core/src/services/literature-service.js` | OpenAlex/Crossref、规范化与去重 |
+| 插件生成器 | `../workbench-core/src/generator.js` | Plugin Spec、隔离生成、验证、安装与 Core 桥接 |
+| 操作台 | `../workbench-core/src/core/workbench-server.js` | localhost API、页面与 DSH 回传 |
+
+技术栈：Node.js、JavaScript ESM、DSH、Cordis Patch、YAML Persona/Skill、JSON Schema、可配置状态机、SQLite（WAL、事务、实体表）、OfficeParser、可选 Tesseract OCR、OpenAI-compatible Embedding、Hash fallback、RRF、OpenAlex/Crossref、原生 HTTP 页面与 `node:test`。
+
+### 本地验证
+
+```powershell
+cd D:\雷达毕设相关\high_star\text-workbench-assistant
 npm.cmd run check
-```
 
-Core 的 Runtime、状态机、插件和端到端行为应在 `../workbench-core` 中单独验证：
-
-```powershell
 cd ..\workbench-core
-npm.cmd test
 npm.cmd run check
+npm.cmd test
 ```
 
-## 项目边界
+当前测试覆盖项目生命周期、领域状态机、材料和批量目录导入、检索、Embedding Profile、书目、模板重构、版本恢复、插件生成和工具暴露。
 
-- 本仓库不内嵌 `dsh-workbench-core`，也不直接存储用户项目；
-- 本仓库不替代领域工作台插件；它负责引导用户设计、安装、选择和使用这些插件；
-- 工作台不会未经授权读取材料，也不会在审查阶段直接改正文；
-- 生成内容应基于绑定项目、授权材料与可追溯证据，最终交付仍应由用户或领域专家确认。
+## 当前边界
+
+- 当前目标是多格式资料的**文本解析与向量化**，不是完整的多模态图像向量检索；
+- 代码文件可按文本导入并生成语义说明，当前没有基于 AST 的代码理解；
+- OCR 质量依赖图片清晰度、语言包和本机资源；失败会被记录，不会伪装为可用文本；
+- 在线书目是候选元数据，不等同于学术事实、法律结论或完整全文；
+- 最终论文、专利与技术结论仍须由用户或领域专家复核。

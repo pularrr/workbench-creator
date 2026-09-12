@@ -17,6 +17,7 @@ type Message = {
   streaming?: boolean;
   result?: AgentInteractionResult;
 };
+type SourceRepository = { id: string; displayName: string; state: string; allowedToSendContext: boolean };
 
 export function AgentPanel({ selected, sessionId, onCommitted }: { selected: KnowledgeNode; sessionId: string; onReveal: (id: string) => void; onCommitted?: () => Promise<void> | void }) {
   const [mode, setMode] = useState<PanelMode>("compact");
@@ -25,6 +26,11 @@ export function AgentPanel({ selected, sessionId, onCommitted }: { selected: Kno
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [ingestKind, setIngestKind] = useState<IngestKind>("document");
+  const [sourceRepositories, setSourceRepositories] = useState<SourceRepository[]>([]);
+  const [codeRepositoryId, setCodeRepositoryId] = useState("");
+  const [sourceRootPath, setSourceRootPath] = useState("");
+  const [connectingSource, setConnectingSource] = useState(false);
+  const [projectingSource, setProjectingSource] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldFollowThreadRef = useRef(true);
   const jobTextCache = useRef(new Map<string, { revision: number; text: string }>());
@@ -33,6 +39,40 @@ export function AgentPanel({ selected, sessionId, onCommitted }: { selected: Kno
     const thread = threadRef.current;
     if (thread && shouldFollowThreadRef.current) thread.scrollTop = thread.scrollHeight;
   }, [messages]);
+
+  const refreshSourceRepositories = async () => {
+    const response = await fetch("/api/codegraph/repositories", { cache: "no-store" });
+    const value = response.ok ? await response.json() as { repositories?: SourceRepository[] } : { repositories: [] };
+    setSourceRepositories((value.repositories ?? []).filter((repository) => repository.state === "ready" && repository.allowedToSendContext));
+  };
+
+  useEffect(() => { void refreshSourceRepositories().catch(() => { /* Source interpretation is optional. */ }); }, []);
+
+  const connectSourceRepository = async () => {
+    if (!sourceRootPath.trim() || connectingSource) return;
+    setConnectingSource(true); setError("");
+    try {
+      const response = await fetch("/api/codegraph/repositories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rootPath: sourceRootPath.trim(), allowContext: true, startIndex: true }) });
+      const value = await response.json() as { repository?: SourceRepository; error?: string };
+      if (!response.ok || !value.repository) throw new Error(value.error ?? "无法连接源码仓库。");
+      await refreshSourceRepositories();
+      setCodeRepositoryId(value.repository.id); setSourceRootPath("");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "无法连接源码仓库。"); }
+    finally { setConnectingSource(false); }
+  };
+
+  const continueSourceProjection = async () => {
+    if (!codeRepositoryId || projectingSource) return;
+    setProjectingSource(true); setError("");
+    try {
+      const response = await fetch(`/api/codegraph/repositories/${encodeURIComponent(codeRepositoryId)}/projection`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ maxFiles: 4, maxSymbols: 8 }) });
+      const value = await response.json() as { state?: string; batch?: { filePaths?: string[] }; error?: string };
+      if (!response.ok) throw new Error(value.error ?? "无法继续源码解析。");
+      if (value.state === "complete") setError("当前索引中的可投影文件已处理；同步仓库后可继续增量解析。");
+      await onCommitted?.();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "无法继续源码解析。"); }
+    finally { setProjectingSource(false); }
+  };
 
   const updateThreadFollowState = () => {
     const thread = threadRef.current;
@@ -90,7 +130,7 @@ export function AgentPanel({ selected, sessionId, onCommitted }: { selected: Kno
     try {
       const response = await fetch("/api/agent/jobs", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId, nodeId: selected.id, kind, query: text, sourceText, sourceKind: ingestKind }),
+        body: JSON.stringify({ sessionId, nodeId: selected.id, kind, query: text, sourceText, sourceKind: ingestKind, ...(kind === "chat" && codeRepositoryId ? { codeRepositoryId } : {}) }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "启动任务失败");
@@ -150,9 +190,7 @@ export function AgentPanel({ selected, sessionId, onCommitted }: { selected: Kno
   };
 
   const summarize = async () => {
-    const completed = messages.filter((item) => !item.streaming && item.text.trim());
-    if (!completed.length) { setError("当前还没有可整理的对话。"); return; }
-    await startJob("summary", "总结当前对话并补充知识", completed.map((item) => item.label + "：" + item.text).join("\\n").slice(-80000));
+    await startJob("summary", "总结当前对话并补充知识");
   };
 
   const confirm = async (candidate: PendingChangeView) => {
@@ -199,7 +237,7 @@ export function AgentPanel({ selected, sessionId, onCommitted }: { selected: Kno
         </div>
       </header>
       {mode !== "collapsed" ? <div className="graph-agent-body">
-        <form className="agent-query" onSubmit={ask}><label htmlFor="agent-query">围绕当前节点提问</label><div><textarea id="agent-query" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder={`询问“${selected.title}”，Enter 发送，Shift+Enter 换行；或粘贴资料后点“整理资料”`} /><button type="submit" disabled={busy || !query.trim()} aria-label="发送问题">↑</button></div><div className="ingest-kind-bar"><span>资料类型：</span><select value={ingestKind} onChange={(e) => setIngestKind(e.target.value as IngestKind)} disabled={busy} aria-label="选择资料类型"><option value="document">文档</option><option value="conversation">对话记录</option><option value="summary">知识摘要</option><option value="paper">文献/技术方案</option></select></div>{busy ? <small className="agent-busy-hint">回答生成中，可稍候…</small> : null}</form>
+        <form className="agent-query" onSubmit={ask}><label htmlFor="agent-query">围绕当前节点提问</label><div><textarea id="agent-query" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder={`询问“${selected.title}”，Enter 发送，Shift+Enter 换行；或粘贴资料后点“整理资料”`} /><button type="submit" disabled={busy || !query.trim()} aria-label="发送问题">↑</button></div><div className="ingest-kind-bar"><span>资料类型：</span><select value={ingestKind} onChange={(e) => setIngestKind(e.target.value as IngestKind)} disabled={busy} aria-label="选择资料类型"><option value="document">文档</option><option value="conversation">对话记录</option><option value="summary">知识摘要</option><option value="paper">文献/技术方案</option></select></div>{sourceRepositories.length ? <div className="source-mode"><label><input type="checkbox" checked={Boolean(codeRepositoryId)} onChange={(event) => setCodeRepositoryId(event.target.checked ? sourceRepositories[0]?.id ?? "" : "")} disabled={busy} /> 源码解读</label>{codeRepositoryId ? <><select value={codeRepositoryId} onChange={(event) => setCodeRepositoryId(event.target.value)} disabled={busy} aria-label="选择源码仓库">{sourceRepositories.map((repository) => <option value={repository.id} key={repository.id}>{repository.displayName}</option>)}</select><button type="button" onClick={() => void continueSourceProjection()} disabled={busy || projectingSource}>{projectingSource ? "解析中…" : "继续解析一批"}</button></> : null}</div> : null}<details className="source-setup"><summary>连接本地源码仓</summary><p>仅索引你授权的目录；代码解读不会影响已有知识节点。</p><div><input value={sourceRootPath} onChange={(event) => setSourceRootPath(event.target.value)} placeholder="本地仓库绝对路径" disabled={busy || connectingSource} /><button type="button" onClick={() => void connectSourceRepository()} disabled={!sourceRootPath.trim() || busy || connectingSource}>{connectingSource ? "索引中…" : "连接并索引"}</button></div></details>{busy ? <small className="agent-busy-hint">回答生成中，可稍候…</small> : null}</form>
         <div className="agent-thread" ref={threadRef} onScroll={updateThreadFollowState} aria-live="polite">
           {messages.length ? messages.map((message) => (
             <article key={message.id} className={`agent-message ${message.role}${message.result?.candidate ? " knowledge_candidate" : ""}${message.streaming ? " streaming" : ""}`}>
@@ -208,6 +246,7 @@ export function AgentPanel({ selected, sessionId, onCommitted }: { selected: Kno
               {message.streaming && message.id.startsWith("job-reply-") ? <button className="stop-task" onClick={() => { void fetch("/api/agent/jobs", {method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({sessionId,id:message.id.slice("job-reply-".length)})}).then((response) => { if (!response.ok) setError("停止任务失败，请重试。"); }); }}>停止任务</button> : null}
               {message.streaming && message.text ? <span className="stream-cursor" aria-hidden="true">▍</span> : null}
               {message.result?.observations.length ? <details className="observation-log"><summary>{message.result.observations.length} 次知识观察</summary><ol>{message.result.observations.map((item) => <li key={`${message.id}-${item.round}`}>{item.summary}</li>)}</ol></details> : null}
+              {message.result?.codeCitations?.length ? <details className="code-citations"><summary>{message.result.codeCitations.length} 条源码引用</summary><ul>{message.result.codeCitations.map((citation) => <li key={`${citation.path}:${citation.startLine}:${citation.endLine}`}><code>{citation.path}</code> 第 {citation.startLine}–{citation.endLine} 行</li>)}</ul>{message.result.codeLimitations?.map((item) => <p key={item}>{item}</p>)}</details> : null}
               {message.result?.candidate ? <div className="candidate-details"><b>{message.result.candidate.summary}</b><p>{message.result.candidate.rationale}</p><small>新增 {message.result.candidate.projectionDiff.nodes.added.length} 个节点，更新 {message.result.candidate.projectionDiff.cards.updated.length + message.result.candidate.projectionDiff.cards.added.length} 张卡片</small><div className="candidate-actions"><button onClick={() => void confirm(message.result!.candidate!)} disabled={busy}>确认写入</button><button onClick={() => void reject(message.id, message.result!.candidate!)} disabled={busy}>拒绝</button></div></div> : null}
               {message.result?.warning ? <small className="message-warning">{message.result.warning}</small> : null}
             </article>

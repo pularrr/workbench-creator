@@ -14,8 +14,13 @@ export const thesisLogic = {
     const chapterId = outlineNode.id
     const basePurpose = outlineNode.objective || `撰写${outlineNode.title}章节`
 
-    // Default logic blocks per chapter type
     const logicTemplates = {
+      'abstract-zh': [
+        { purpose: '摘要四要素：研究问题、方法、主要结果和结论', transition: '压缩全文证据链，不新增事实' },
+      ],
+      'abstract-en': [
+        { purpose: '英文摘要与关键词：保持与中文摘要的术语和结论一致', transition: '使用领域通用译法' },
+      ],
       ch1: [
         { purpose: '研究背景与意义：阐述研究领域的重要性和现实需求', transition: '从宏观背景引入具体研究问题' },
         { purpose: '国内外研究现状：梳理相关领域的研究进展和不足', transition: '通过文献综述引出研究空白' },
@@ -35,16 +40,27 @@ export const thesisLogic = {
         { purpose: '实验方案设计：说明实验设置、数据采集和评估指标', transition: '为下一章实验结果做铺垫' },
       ],
       ch4: [
-        { purpose: '实验数据与设置：描述实验数据来源、预处理和实验环境', transition: '从数据到结果' },
-        { purpose: '主要实验结果：展示核心实验结果并进行初步分析', transition: '从结果到分析' },
-        { purpose: '对比实验与分析：与现有方法进行定量对比，分析优劣', transition: '突出本文方法优势' },
-        { purpose: '误差分析与讨论：分析实验误差来源和方法局限性', transition: '客观评价' },
+        { purpose: '实验平台与对象：说明装置、样本或数据来源及边界条件', transition: '建立可复现实验前提' },
+        { purpose: '采集与处理协议：描述采样、标定、预处理和质量控制', transition: '从原始数据到可用数据' },
+        { purpose: '对比与评价设计：说明基线、指标、统计方法和超参数', transition: '为结果解读建立标准' },
+        { purpose: '本章小结', transition: '引出结果分析' },
       ],
       ch5: [
-        { purpose: '研究结论：总结本文的主要研究成果和贡献', transition: '从具体到概括' },
-        { purpose: '创新点总结：明确列出本文的创新之处', transition: '突出学术价值' },
-        { purpose: '不足与局限：客观分析研究的局限性', transition: '从成果到不足' },
-        { purpose: '未来工作展望：提出后续研究方向和改进思路', transition: '展望未来' },
+        { purpose: '主要结果：呈现核心结果并标明图表、数据与统计证据', transition: '从结果到解释' },
+        { purpose: '对比与消融：与基线比较并分析关键设计的贡献', transition: '解释方法有效性的边界' },
+        { purpose: '误差、不确定度与局限：说明偏差来源和适用范围', transition: '避免超出证据的结论' },
+        { purpose: '本章小结', transition: '引出结论' },
+      ],
+      ch6: [
+        { purpose: '研究结论：逐项回扣研究问题与已验证结果', transition: '从证据到结论' },
+        { purpose: '创新点与贡献：只总结前文已论证的贡献', transition: '突出价值但不夸大' },
+        { purpose: '局限与展望：说明限制条件和可验证的后续方向', transition: '结束全文' },
+      ],
+      refs: [
+        { purpose: '参考文献一致性核验：正文引用、书目元数据和格式一一对应', transition: '完成交付前核验' },
+      ],
+      ack: [
+        { purpose: '致谢', transition: '全文结束' },
       ],
     }
 

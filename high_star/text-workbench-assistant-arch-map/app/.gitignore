@@ -52,3 +52,8 @@ dev-server.log
 test-*.png
 test-*.pdf
 /data/runtime/
+/.codegraph/
+/examples/fmcw-radar/runtime/
+/examples/fmcw-radar/.sites-runtime/
+
+plugins/dsh-plugin/node_modules/

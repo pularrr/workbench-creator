@@ -12,6 +12,8 @@ export interface StoredAgentJob {
   progress?: string; error?: string; result?: Omit<AgentInteractionResult, "text">;
   textBytes: number; textChecksum: string; revision: number;
   sourceText?: string; sourceKind?: "conversation" | "summary" | "paper" | "document";
+  /** Opt-in only: repository source used by a chat task. */
+  codeRepositoryId?: string;
   retryCount: number; workerId?: string; startedAt?: string; finishedAt?: string;
 }
 export interface JobStore {

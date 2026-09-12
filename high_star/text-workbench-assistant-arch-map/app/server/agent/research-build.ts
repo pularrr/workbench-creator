@@ -9,7 +9,7 @@ import type { ResearchDocument } from "./research-output";
 
 const normalize = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, "");
 const nodeTypes = new Set(["domain","category","problem","concept","method","algorithm","model","component","artifact","parameter","metric","application"]);
-const edgeTypes = new Set(["SIMILAR_TO","ALTERNATIVE_TO","PREREQUISITE_OF","PART_OF","INPUT_TO","OUTPUT_OF","USES_MODEL","IMPLEMENTS","DERIVED_FROM","AFFECTS","MITIGATES","EVALUATED_BY"]);
+const edgeTypes = new Set(["SIMILAR_TO","ALTERNATIVE_TO","PREREQUISITE_OF","PART_OF","INPUT_TO","OUTPUT_OF","USES_MODEL","IMPLEMENTS","DERIVED_FROM","AFFECTS","MITIGATES","EVALUATED_BY","CALLS","CALLED_BY","DEPENDS_ON"]);
 
 export function operationsFromResearch(document: ResearchDocument, dataset: KnowledgeDataset, currentNodeId: string, staged?: StagedKnowledgeImport) {
   const p = document.proposal;
@@ -24,7 +24,15 @@ export function operationsFromResearch(document: ResearchDocument, dataset: Know
   const operations: GraphOperation[] = evidence.map((item) => ({ kind:"upsert-evidence", evidence:item }));
   if (staged) {
     operations.push({ kind:"upsert-source", source:staged.artifact });
-    for (const claim of staged.claims) operations.push({ kind:"upsert-claim", claim });
+    // Conversation segmentation can yield identical paragraphs.  Claims use a
+    // deterministic id, so emitting both would create two operations aimed at
+    // the same record and correctly fail the hard-review gate.
+    const claimIds = new Set<string>();
+    for (const claim of staged.claims) {
+      if (claimIds.has(claim.id)) continue;
+      claimIds.add(claim.id);
+      operations.push({ kind:"upsert-claim", claim });
+    }
   }
   const cards = new Map<string,KnowledgeCard>();
   function addBlock(nodeId: string, raw: { type: string; title: string; text: string; items?: string[]; code?: string; language?: CardBlock["language"] }) {

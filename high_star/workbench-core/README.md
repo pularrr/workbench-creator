@@ -42,7 +42,7 @@ Workbench Core 是面向 DSH（DeepSeek Harness）的结构化文本工作台执
 
 - Node.js **22.19.0 或更高版本**；
 - Windows 建议使用 `npm.cmd`；
-- 核心 JSON 存储无需数据库服务；
+- Core 使用 Node 内置 SQLite（无需独立数据库服务）；
 - 基础 Markdown/Text 导出无需外部服务；
 - DOCX 使用 `docx`，PDF 通常通过领域 Exporter 和 XeLaTeX 生成。
 
@@ -117,7 +117,7 @@ LLM 执行时应经历“分析任务 → 设计 Spec → 生成 MVP → 用户�
 | --- | --- | --- |
 | 宿主平台 | DSH `@deepseek-ai/dsh@0.1.1-rc.2`、Cordis Patch | 插件加载、工具注册和 Web 注入 |
 | 运行时 | Node.js `^22.19.0 || >=24.0.0`、原生 ESM | 项目生命周期和能力编排 |
-| 数据与存储 | JavaScript、JSON、`node:fs/promises`、UUID | 项目、会话、材料、运行记录和快照 |
+| 数据与存储 | SQLite（WAL）、UUID、Node 内置 `node:sqlite` | 项目、会话、材料、运行记录、快照与审计 |
 | 工具契约 | JSON Schema、Plugin Spec、revision 检查 | 参数校验、插件校验和并发保护 |
 | 材料服务 | `officeparser@7.8.0`、`pdfjs-dist@6.2.108` | 文档解析和文本提取 |
 | 检索服务 | 分块、192 维 hash embedding、关键词/向量混合检索 | 材料召回和证据绑定 |
@@ -211,7 +211,7 @@ registerExporter({
 
 | 层 | 能力 | 状态 |
 | --- | --- | --- |
-| Runtime | 项目、会话、状态机、JSON 存储、版本和审计 | ✅ 可用 |
+| Runtime | 项目、会话、状态机、SQLite-only 存储、版本和审计 | ✅ 可用 |
 | 插件 | Framework、Logic、Evidence、Material 注册与按任务解析 | ✅ 可用 |
 | 阶段治理 | design、write、review 会话阶段与工具执行边界 | ✅ 可用 |
 | 材料与检索 | 多格式解析、分块、Embedding 和混合检索 | ✅ 可用 |

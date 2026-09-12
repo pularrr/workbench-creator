@@ -8,3 +8,27 @@
         storagePath: ''
         generatedOutputRoot: ''
         workbenchPort: 3200
+        # Users can choose only profiles declared here; never put apiKey here.
+        # retrieval:
+        #   defaultProfileId: offline-hash
+        #   profiles:
+        #     offline-hash:
+        #       name: 离线基础检索
+        #       embedding: { type: hash, dimensions: 192 }
+        #     dashscope-v4:
+        #       name: 百炼中文语义检索
+        #       dataBoundary: 重建索引时会将已授权材料文本发送给百炼
+        #       embedding:
+        #         type: openai-compatible
+        #         endpoint: https://your-workspace.example/compatible-mode/v1
+        #         model: text-embedding-v4
+        #         dimensions: 1024
+        #         apiKeyEnv: DASHSCOPE_API_KEY
+        # For a DashScope workspace-specific endpoint, set this non-secret
+        # environment variable before starting DSH:
+        # DASHSCOPE_COMPATIBLE_BASE_URL=https://your-workspace.example/compatible-mode/v1
+        # OCR is local Tesseract by default. Optional offline language data:
+        # ocr:
+        #   language: chi_sim+eng
+        #   langPath: D:/models/tessdata
+        #   timeoutMs: 60000

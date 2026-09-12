@@ -13,5 +13,5 @@ while (true) {
   const stored = await runtimeAgentJobStore().load(id);
   if (!stored || (stored.job.state !== "queued" && stored.job.state !== "running")) continue;
   if (await queue.isCancelled(id)) continue;
-  await startAgentJob({ id, sessionId: stored.job.sessionId, nodeId: stored.job.nodeId, kind: stored.job.kind, query: stored.job.query, sourceText: stored.job.sourceText, sourceKind: stored.job.sourceKind });
+  await startAgentJob({ id, sessionId: stored.job.sessionId, nodeId: stored.job.nodeId, kind: stored.job.kind, query: stored.job.query, sourceText: stored.job.sourceText, sourceKind: stored.job.sourceKind, codeRepositoryId: stored.job.codeRepositoryId });
 }

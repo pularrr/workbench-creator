@@ -30,9 +30,10 @@ const DEFAULT_PATENT_OUTLINE = [
 
 export const patentFramework = {
   id: 'patent-framework',
-  name: '专利撰写框架',
+  name: '专利撰写框架 v2',
   taskType: 'patent',
-  description: '发明专利/实用新型专利申请文件的大纲结构和状态机。包含技术领域、背景技术、发明内容、附图说明、具体实施方式、权利要求书、说明书摘要等标准章节。',
+  version: '2.0.0',
+  description: '证据优先的发明/实用新型申请文件框架。将现有技术检索、可专利性评估、说明书支持关系与权利要求审查纳入可配置状态机。',
   stateTable: PATENT_STATE_TABLE,
   defaultSkipStages: ['planning', 'awaiting_plan_confirmation'],
   outlineNodeSchema: {
@@ -49,6 +50,9 @@ export const patentFramework = {
     patentType: { label: '专利类型', type: 'select', options: ['invention', 'utility_model'] },
     applicant: { label: '申请人', type: 'text' },
     inventors: { label: '发明人', type: 'text' },
+    jurisdiction: { label: '申请地区', type: 'select', options: ['CN'] },
+    applicationLanguage: { label: '申请文本语言', type: 'select', options: ['zh'] },
+    technicalField: { label: '技术领域', type: 'text' },
   },
 
   async generateOutline(input = {}) {

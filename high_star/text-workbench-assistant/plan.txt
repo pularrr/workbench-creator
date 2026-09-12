@@ -1,0 +1,574 @@
+# DSH + Core + 工作台重构开发计划
+
+## 一、最终定位
+
+```text
+DSH
+= 自然语言入口 + Agent 编排器 + LLM 执行器
+
+Workbench Core Service
+= 唯一、可审计、确定性的业务内核
+
+工作台页面
+= 项目、材料、RAG、Diff、版本、任务与轨迹的可视化控制面
+
+领域插件
+= Framework / Logic / Evidence / Material 配置包
+```
+
+核心原则：
+
+- Core 是项目数据唯一写入者；
+- 页面和 DSH 都通过 Core API 操作同一个项目；
+- DSH 不依赖页面标签页，页面也不依赖 DSH 的 `window.opener`；
+- `wb_*` 工具继续保留，是 DSH 操作 Core 和生成领域插件的语言；
+- 分阶段治理继续保留，并升级为可持久化、可审计状态；
+- LLM 一律提交候选，用户确认后 Core 才写最终正文。
+
+---
+
+# 二、范围与非目标
+
+本轮目标：
+
+- 修复 DSH 与工作台断裂的通信、绑定、服务生命周期问题；
+- 建立唯一 Core Service；
+- 保留论文、专利、技术报告及未来生成领域工作台能力；
+- 让页面可独立打开并稳定工作；
+- 让 DSH 处理页面创建的 AI 任务；
+- 保留 RAG、Embedding、材料解析、证据绑定、版本、Diff 与审计。
+
+本轮不做：
+
+- Tauri/Electron 独立桌面安装包；
+- 多用户、远程协同、云端部署；
+- 自研模型推理服务；
+- 多模态图像向量检索与 rerank；
+- 重新设计论文/专利的视觉页面组件体系。
+
+桌面应用封装将在 Core Service 稳定后作为下一阶段。
+
+---
+
+# 三、当前状态
+
+已完成、可复用：
+
+- [x] 论文/专利内置插件 v2；
+- [x] 多格式材料导入、目录批量导入、OCR 基础能力；
+- [x] RAG 分块、Embedding Provider、混合检索、证据绑定；
+- [x] 材料轻量分页清单、定向材料/分块读取；
+- [x] 模板、版本、在线文献基础能力；
+- [x] 候选 Diff、审查建议、Agent 轨迹的初始数据模型；
+- [x] `wb_set_manuscript` 默认分块 upsert；整篇覆盖要求显式确认；
+- [x] 领域工作台 Plugin Spec 生成、校验、安装链路。
+
+当前必须替换的问题：
+
+- [ ] DSH 内 Runtime 与独立页面 Runtime 可能同时写 JSON；
+- [ ] 项目绑定依赖不稳定的 `sessionId`；
+- [ ] 页面 AI 按钮依赖 `window.opener.postMessage()`；
+- [ ] 3200 工作台服务依赖懒启动，可能未运行；
+- [ ] AI 任务、阶段、候选、进度没有统一持久化队列；
+- [ ] 当前页面不能真正直接完成 RAG、证据、文献等确定性操作；
+- [ ] JSON 文件不适合作为长任务、并发、任务审计的最终存储。
+
+---
+
+# 四、开发阶段
+
+## Phase 0：止损与数据保护
+
+目标：保证不再发生正文覆盖、页面失效或无项目状态却伪装成工作台。
+
+实施：
+
+1. 固化分块正文写入协议。
+
+```text
+wb_set_manuscript 默认：upsert
+块身份：id 或 outlineNodeId
+整篇替换：replaceAll=true + userConfirmed=true + expectedRevision
+```
+
+2. 所有正文变更前创建自动快照：
+
+```text
+pre-write snapshot
+→ 正文写入
+→ 版本与审计记录
+```
+
+3. 页面启动检查：
+
+```text
+服务是否存活
+→ API 是否可访问
+→ 页面脚本是否可解析
+→ 工作区是否存在
+→ 当前项目是否有效
+```
+
+4. 无绑定项目时，只显示项目首页，不渲染半残缺工作台。
+
+验收：
+
+- 分 5 次写入第 1–5 章后，五章同时保留；
+- 未确认整篇替换被拒绝；
+- 项目归档后页面明确进入项目选择状态；
+- 服务未启动时显示恢复按钮与错误原因，不显示空白页。
+
+状态：分块写入保护已完成；启动检查与自动快照待完成。
+
+---
+
+## Phase 1：唯一 Core Service
+
+目标：Core 成为唯一数据写入者。
+
+实施：
+
+1. 新建长驻 Core Service：
+
+```text
+Workbench Core Service
+- 单实例锁
+- 本地 HTTP API
+- 健康检查
+- 项目存储
+- 文件受管副本
+- RAG 索引
+- 任务队列
+```
+
+2. DSH 插件移除直接存储访问：
+
+```text
+旧方式：
+DSH Runtime → JSON 文件
+
+新方式：
+DSH wb_* 工具 → Core HTTP API → 数据库
+```
+
+3. 页面也只访问 Core API：
+
+```text
+页面 → Core API
+```
+
+4. 启动策略：
+
+```text
+DSH 启动
+→ 检测 Core Service
+→ 未运行则启动
+→ 检查 /health
+→ 注册 wb_* 工具
+
+页面打开
+→ 检测 Core Service
+→ 读取工作区
+→ 恢复当前项目
+```
+
+验收：
+
+- 仅运行一个 Core Service；
+- 重启 DSH 不影响项目与材料；
+- 刷新页面不影响项目；
+- 服务未运行时能自动恢复；
+- 不存在两个 Runtime 分别写同一项目文件。
+
+---
+
+## Phase 2：SQLite 与审计模型
+
+目标：让状态机、版本、任务与审计具备事务一致性。
+
+实施：
+
+1. 从 JSON 迁移至 SQLite。
+
+主要表：
+
+```text
+workspaces
+projects
+materials
+material_chunks
+source_bindings
+manuscript_blocks
+manuscript_versions
+review_suggestions
+regeneration_candidates
+agent_tasks
+agent_traces
+audit_events
+```
+
+2. 每次写操作在一个事务内完成：
+
+```text
+revision 校验
+→ 业务写入
+→ 版本记录
+→ audit_event
+→ 提交
+```
+
+3. 审计事件统一格式：
+
+```json
+{
+  "actor": "user | dsh-agent | page | system",
+  "action": "manuscript.upsert",
+  "projectId": "...",
+  "beforeRevision": 12,
+  "afterRevision": 13,
+  "traceId": "...",
+  "timestamp": "..."
+}
+```
+
+4. 增加导出与备份：
+
+```text
+数据库自动备份
++ 项目审计导出
++ 文稿版本导出
+```
+
+验收：
+
+- 可查询“哪次操作覆盖/更新了哪个文本块”；
+- revision 冲突可拒绝而不损坏数据；
+- Core 意外退出后可恢复；
+- 可恢复到任一正文版本。
+
+---
+
+## Phase 3：稳定工作区与项目绑定
+
+目标：页面和 DSH 永远理解同一个当前项目。
+
+实施：
+
+1. 引入固定 `workspaceId`：
+
+```text
+web:text-workbench-assistant-v0
+```
+
+2. 项目绑定改为：
+
+```text
+workspaceId → activeProjectId
+```
+
+不再使用：
+
+```text
+DSH sessionId → projectId
+```
+
+3. 新增接口：
+
+```text
+GET /workspaces/:workspaceId
+PUT /workspaces/:workspaceId/active-project
+```
+
+4. 绑定规则：
+
+```text
+创建项目 → 自动成为当前项目
+切换项目 → 更新 workspace
+DSH 与页面 → 读取同一 workspace
+项目归档 → 清空绑定并回到选择页
+```
+
+5. `wb_bind_project` 兼容保留，但内部映射为设置当前工作区项目；逐步引入更明确工具：
+
+```text
+wb_get_workspace
+wb_set_active_project
+```
+
+验收：
+
+- 创建论文项目后，DSH 与页面都自动切入该项目；
+- 页面刷新、浏览器关闭重开、DSH 重启后仍恢复同一项目；
+- 不再出现 `default`、随机 session 或错误项目绑定。
+
+---
+
+## Phase 4：页面直连确定性能力
+
+目标：页面不依赖 DSH 也可完成非 AI 操作。
+
+页面直连 Core 的功能：
+
+| 功能 | 页面行为 |
+|---|---|
+| 项目 | 新建、切换、归档、恢复 |
+| 材料 | 单文件/目录导入、进度、失败清单 |
+| 材料验收 | 分页、字符数、页数、warnings、sha256、分块数 |
+| RAG | 输入问题、展示命中分块、定位来源 |
+| 证据 | 选择正文块、选择证据块、绑定并写审计 |
+| Embedding | 显示管理员预设模型、确认后重建索引 |
+| 在线文献 | 候选列表、用户确认后加入文献表 |
+| 模板 | 导入、预览、应用、回滚 |
+| 版本 | 快照、Diff、恢复、导出 |
+
+删除页面中的：
+
+```js
+window.opener.postMessage(...)
+```
+
+验收：
+
+- 页面直接打开时不再出现“请从 DSH 打开”；
+- 可从页面完成材料导入、RAG 检索、证据绑定、版本恢复；
+- 所有页面写入在 Core 审计中可见。
+
+---
+
+## Phase 5：AgentTask 队列与 DSH 通信
+
+目标：DSH 成为可靠的 AI 执行器，而非页面父窗口。
+
+### 任务模型
+
+```text
+AgentTask
+- id
+- workspaceId
+- projectId
+- type
+- payload
+- status
+- executor
+- progress
+- result
+- error
+- traceId
+```
+
+任务类型：
+
+```text
+generate_outline
+regenerate_diff
+review_manuscript
+search_literature
+analyze_material
+generate_plugin_spec
+```
+
+状态机：
+
+```text
+queued
+→ claimed
+→ running
+→ candidate_ready
+→ awaiting_user_confirmation
+→ completed
+
+失败路径：
+failed / cancelled / stale
+```
+
+### 页面到 Core
+
+页面点击“审查”：
+
+```text
+POST /agent-tasks
+type = review_manuscript
+```
+
+页面点击“Diff 再生成”：
+
+```text
+POST /agent-tasks
+type = regenerate_diff
+payload = Diff + 用户方向 + 已接受审查建议
+```
+
+### DSH 到 Core
+
+新增或调整工具：
+
+```text
+wb_get_workspace
+wb_set_active_project
+wb_list_agent_tasks
+wb_claim_agent_task
+wb_update_agent_task_progress
+wb_submit_agent_task_result
+wb_complete_agent_task
+wb_fail_agent_task
+```
+
+DSH Skill 行为：
+
+```text
+读取工作区
+→ 获取当前项目
+→ 领取待办任务
+→ 调用 RAG/文献/LLM
+→ 更新进度
+→ 提交候选与证据
+→ 等待用户页面确认
+```
+
+验收：
+
+- 页面发起再生成，不需要 DSH 特殊链接；
+- 页面看到“排队 / 运行 / 候选已生成 / 等待确认”；
+- DSH 重启后可继续领取未完成任务；
+- Agent 不能直接覆盖正文；
+- 用户确认后才完成写入。
+
+---
+
+## Phase 6：候选 Diff、审查与轨迹闭环
+
+目标：实现“用户修改 Diff + 审查建议 → 再生成候选 → 用户确认”。
+
+实施：
+
+1. 审查输出只生成 `ReviewSuggestion`，不改正文。
+2. 用户选择、编辑或拒绝建议。
+3. 页面生成 `regenerate_diff` 任务。
+4. DSH 基于：
+
+```text
+用户 Diff
++ 已接受审查建议
++ 当前章节目标
++ RAG 证据
++ 模板约束
+```
+
+提交候选。
+5. 页面按块展示：
+
+```text
+原文
+候选
+证据
+生成理由
+接受 / 拒绝 / 编辑后接受
+```
+
+6. Core 仅合并用户接受的块，自动创建版本与审计记录。
+
+验收：
+
+- 审查不会直接改正文；
+- 只接受第 2、第 3 项候选时，仅写入这两项；
+- 后续分章生成不会覆盖既有章节；
+- 每个候选都能追溯到证据、任务、模型配置与用户确认。
+
+---
+
+## Phase 7：领域插件能力保持与升级
+
+目标：重构后仍可自然语言创建领域工作台。
+
+保留工具：
+
+```text
+wb_analyze_task_description
+wb_create_plugin_spec_draft
+wb_validate_plugin_spec
+wb_generate_plugin_bundle
+wb_verify_generated_plugin_bundle
+wb_install_generated_plugin
+```
+
+领域插件继续定义：
+
+```text
+Framework：字段、大纲、校验、状态机、UI Schema
+Logic：章节写作目标、风格、衔接
+Evidence：引用与证据规则
+Material：材料类型、归一化、分析策略
+```
+
+Core 统一提供：
+
+```text
+项目
+材料解析
+RAG
+任务队列
+版本
+候选 Diff
+审计
+工作区绑定
+```
+
+验收：
+
+- 用户可让 DSH 创建“技术报告”或其他领域 Plugin Spec；
+- 生成插件经校验后可安装；
+- 新建该领域项目时，页面加载领域字段、大纲与规则；
+- 领域插件不自行写数据库、不自行创建服务。
+
+---
+
+# 五、建议开发顺序
+
+```text
+Phase 0：止损与启动检查
+→ Phase 1：唯一 Core Service
+→ Phase 2：SQLite 与审计
+→ Phase 3：Workspace / 当前项目
+→ Phase 4：页面直连确定性能力
+→ Phase 5：AgentTask + DSH 通信
+→ Phase 6：Diff / 审查 / 轨迹闭环
+→ Phase 7：领域插件兼容与验收
+```
+
+原因：必须先解决唯一写入者、持久化与项目绑定，才能安全地做任务队列和 Agent 通信。
+
+---
+
+# 六、最终预期使用体验
+
+用户在 DSH 中说：
+
+```text
+创建论文项目“微波水分测量毕设研究”，
+导入参考文献目录，使用 text-embedding-v4，
+为绪论补充在线文献并生成候选背景段落。
+```
+
+系统行为：
+
+```text
+DSH 理解自然语言
+→ Core 创建项目并设为当前项目
+→ 页面自动切换到该项目
+→ 页面显示材料导入、索引进度与验收清单
+→ 页面/DSH 创建 AI 任务
+→ DSH 执行 RAG、文献和生成
+→ Core 保存候选 Diff
+→ 页面展示候选、证据与轨迹
+→ 用户逐项确认
+→ Core 安全写入、建版本、记审计
+```
+
+用户不再需要：
+
+- 复制 `sessionId`；
+- 从特定 DSH 链接打开页面；
+- 担心刷新导致项目丢失；
+- 担心分章生成覆盖已写章节；
+- 在页面和 DSH 之间猜测当前到底是哪一个项目；
+- 因 3200 服务未启动而看到空白或失效按钮。

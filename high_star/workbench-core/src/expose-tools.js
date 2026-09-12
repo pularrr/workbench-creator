@@ -59,6 +59,8 @@ function buildToolDefs(runtime, sessionId, options = {}) {
           taskType: { type: 'string', description: '任务类型', enum: ['thesis', 'patent', 'contract', 'tech-report', 'research-proposal', 'clinical-trial', 'generic'] },
           title: { type: 'string', description: '文档正式标题（可选）' },
           targetWords: { type: 'number', description: '目标总字数（可选，默认 30000）' },
+          patentType: { type: 'string', enum: ['invention', 'utility_model'], description: '专利类型；与 domainFields.patentType 同时提供时必须一致' },
+          domainFields: { type: 'object', additionalProperties: true, description: '任务专属字段；专利的 domainFields.patentType 与 patentType 等价' },
           metadata: { type: 'object', additionalProperties: true, description: '额外元数据（可选）' },
           assistantKey: { type: 'string', description: '用于跨 DSH 重启恢复的稳定助手键' },
           confirmedEviction: { type: 'boolean', description: '达到 10 个项目上限时，用户确认归档最早项目后传 true' },
@@ -125,6 +127,22 @@ function buildToolDefs(runtime, sessionId, options = {}) {
         if (args.userConfirmed !== true) throw new Error('Archiving a project requires explicit user confirmation')
         return runtime.deleteProject(args.projectId)
       },
+    },
+    {
+      name: 'wb_update_logic_block',
+      description: '更新当前项目一个行文逻辑块的目标、论点、过渡、证据要求或风格约束。',
+      parameters: { type: 'object', properties: { logicBlockId: { type: 'string' }, purpose: { type: 'string' }, transition: { type: 'string' }, claim: { type: 'string' }, evidenceRequirement: { type: 'string' }, styleConstraint: { type: 'string' }, expectedRevision: { type: 'number' } }, required: ['logicBlockId'] },
+      execute: (args) => runtime.updateLogicBlock(sessionId, args.logicBlockId, args),
+    },
+    {
+      name: 'wb_permanently_delete_archived_project',
+      description: '永久删除一个已归档项目。必须由用户明确确认，并输入完全匹配的项目名称；该操作不可恢复。',
+      parameters: {
+        type: 'object',
+        properties: { projectId: { type: 'string' }, projectNameConfirmation: { type: 'string', description: '用户输入的完整项目名称' }, userConfirmed: { type: 'boolean' } },
+        required: ['projectId', 'projectNameConfirmation', 'userConfirmed'],
+      },
+      execute: (args) => runtime.permanentlyDeleteArchivedProject(args.projectId, { ...args, actor: 'user' }),
     },
     {
       name: 'wb_bind_project',
@@ -269,6 +287,28 @@ function buildToolDefs(runtime, sessionId, options = {}) {
       execute: (args) => runtime.cancelRun(sessionId, args),
     },
 
+    // ─── 在线书目（候选默认不写入项目） ─────────────────────────────────────
+    {
+      name: 'wb_search_literature', description: '检索 OpenAlex/Crossref 开放书目元数据，仅返回候选，不下载全文也不写入项目。',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, yearFrom: { type: 'integer' }, yearTo: { type: 'integer' }, limit: { type: 'integer', minimum: 1, maximum: 30 }, providers: { type: 'array', items: { type: 'string' } } }, required: ['query'] },
+      execute: (args) => runtime.searchLiterature(sessionId, args),
+    },
+    {
+      name: 'wb_add_literature', description: '用户确认后将一个书目候选写入项目书目库；默认只保存元数据。',
+      parameters: { type: 'object', properties: { record: { type: 'object', additionalProperties: true }, userConfirmed: { type: 'boolean' } }, required: ['record', 'userConfirmed'] },
+      execute: (args) => runtime.addLiterature(sessionId, args),
+    },
+    { name: 'wb_list_literature', description: '列出已确认书目及其正文关联。', parameters: { type: 'object', properties: {}, required: [] }, execute: () => runtime.listLiterature(sessionId) },
+    {
+      name: 'wb_bind_literature', description: '将已确认书目关联到正文块；不替代原文证据绑定。',
+      parameters: { type: 'object', properties: { literatureId: { type: 'string' }, blockId: { type: 'string' }, note: { type: 'string' } }, required: ['literatureId', 'blockId'] }, execute: (args) => runtime.bindLiterature(sessionId, args),
+    },
+    { name: 'wb_get_literature_trace', description: '读取书目确认追踪，不返回原始检索文本。', parameters: { type: 'object', properties: {}, required: [] }, execute: () => runtime.getLiteratureTrace(sessionId) },
+    { name: 'wb_import_literature_fulltext', description: '用户确认后导入已确认书目的一份本地全文，并作为证据建立索引。', parameters: { type: 'object', properties: { literatureId: { type: 'string' }, filePath: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['literatureId', 'filePath', 'userConfirmed'] }, execute: (args) => runtime.importLiteratureFulltext(sessionId, args) },
+    { name: 'wb_download_literature_fulltext', description: '用户确认后从 HTTPS 地址下载已确认书目的全文并建立索引。', parameters: { type: 'object', properties: { literatureId: { type: 'string' }, url: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['literatureId', 'url', 'userConfirmed'] }, execute: (args) => runtime.downloadLiteratureFulltext(sessionId, args) },
+    { name: 'wb_request_code_semantic', description: '为已导入代码建立由 DSH 完成的可追溯语义说明请求，原代码不会被修改。', parameters: { type: 'object', properties: { materialId: { type: 'string' }, instruction: { type: 'string' } }, required: ['materialId'] }, execute: (args) => runtime.requestCodeSemanticInterpretation(sessionId, args) },
+    { name: 'wb_save_code_semantic', description: '保存经 DSH 生成的代码语义说明并与原代码双文本索引。', parameters: { type: 'object', properties: { materialId: { type: 'string' }, requestId: { type: 'string' }, semantic: { type: 'object', additionalProperties: true } }, required: ['materialId', 'requestId', 'semantic'] }, execute: (args) => runtime.saveCodeSemanticInterpretation(sessionId, args) },
+
     // ─── 模板 ─────────────────────────────────────────────────────────────
     {
       name: 'wb_list_templates',
@@ -292,6 +332,14 @@ function buildToolDefs(runtime, sessionId, options = {}) {
       },
       execute: (args) => runtime.saveTemplate(sessionId, args),
     },
+    {
+      name: 'wb_import_template_file', description: '导入用户明确选择的模板文件；模板不会进入 RAG 或作为事实证据。',
+      parameters: { type: 'object', properties: { filePath: { type: 'string' }, name: { type: 'string' }, type: { type: 'string', enum: ['outline', 'body', 'both', 'format'] } }, required: ['filePath'] },
+      execute: (args) => runtime.importTemplateFile(sessionId, args.filePath, args),
+    },
+    { name: 'wb_get_template', description: '查看一个模板的提取内容、标题结构和警告。', parameters: { type: 'object', properties: { templateId: { type: 'string' } }, required: ['templateId'] }, execute: (args) => runtime.getTemplate(sessionId, args.templateId) },
+    { name: 'wb_preview_template_restructure', description: '根据模板生成不修改项目的差异预览；正文预览须由 DSH 提供 proposedBlocks。', parameters: { type: 'object', properties: { templateId: { type: 'string' }, kind: { type: 'string', enum: ['outline', 'body'] }, proposedBlocks: { type: 'array', items: { type: 'object', additionalProperties: true } } }, required: ['templateId'] }, execute: (args) => runtime.previewTemplateRestructure(sessionId, args) },
+    { name: 'wb_apply_template_restructure', description: '仅在用户明确确认后应用一个有效且未过期的模板差异预览。', parameters: { type: 'object', properties: { previewId: { type: 'string' }, userConfirmed: { type: 'boolean' } }, required: ['previewId', 'userConfirmed'] }, execute: (args) => runtime.applyTemplateRestructure(sessionId, args) },
 
     // ─── 重新生成 ─────────────────────────────────────────────────────────
     {

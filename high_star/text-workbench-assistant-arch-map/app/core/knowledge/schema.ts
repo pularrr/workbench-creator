@@ -96,7 +96,11 @@ export type EdgeType =
   | "DERIVED_FROM"
   | "AFFECTS"
   | "MITIGATES"
-  | "EVALUATED_BY";
+  | "EVALUATED_BY"
+  /** Program-structure facts used only by the isolated source-decode branch. */
+  | "CALLS"
+  | "CALLED_BY"
+  | "DEPENDS_ON";
 
 export interface SemanticDomain {
   id: SemanticDomainId;
